@@ -1296,9 +1296,9 @@ export class GlobalRoomState {
 			if (this.lastBattle < this.lastWrittenBattle) return;
 			this.lastWrittenBattle = this.lastBattle + LAST_BATTLE_WRITE_THROTTLE;
 		}
-		FS('logs/lastbattle.txt').writeUpdate(
-			() => `${this.lastWrittenBattle}`
-		);
+		// FS('logs/lastbattle.txt').writeUpdate(
+		// 	() => `${this.lastWrittenBattle}`
+		// );
 	}
 
 	reportUserStats() {
