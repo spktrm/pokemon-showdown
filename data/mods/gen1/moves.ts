@@ -546,7 +546,9 @@ export const Moves: {[k: string]: ModdedMoveData} = {
 							showMsg = true;
 						}
 					}
-					if (showMsg) this.add('-activate', target, 'move: Mist');
+					if (showMsg && !(effect as ActiveMove).secondaries) {
+						this.add('-activate', target, 'move: Mist');
+					}
 				}
 			},
 		},
@@ -762,7 +764,6 @@ export const Moves: {[k: string]: ModdedMoveData} = {
 			}
 			// We only prevent when hp is less than one quarter.
 			// If you use substitute at exactly one quarter, you faint.
-			if (target.hp === target.maxhp / 4) target.faint();
 			if (target.hp < target.maxhp / 4) {
 				this.add('-fail', target, 'move: Substitute', '[weak]');
 				return null;
