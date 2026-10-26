@@ -691,8 +691,7 @@ export class Battle {
 		this.event = { id: eventid, target, source, effect: sourceEffect };
 		this.eventDepth++;
 
-		const args = [target, source, sourceEffect];
-		if (hasRelayVar) args.unshift(relayVar);
+		const args = hasRelayVar ? [relayVar, target, source, sourceEffect] : [target, source, sourceEffect];
 
 		let returnVal;
 		if (typeof callback === 'function') {
@@ -852,13 +851,14 @@ export class Battle {
 			this.speedSort(handlers);
 		}
 		let hasRelayVar = 1;
-		const args = [target, source, sourceEffect];
+		let args;
 		// console.log('Event: ' + eventid + ' (depth ' + this.eventDepth + ') t:' + target.id + ' s:' + (!source || source.id) + ' e:' + effect.id);
 		if (relayVar === undefined || relayVar === null) {
 			relayVar = true;
 			hasRelayVar = 0;
+			args = [target, source, sourceEffect];
 		} else {
-			args.unshift(relayVar);
+			args = [relayVar, target, source, sourceEffect];
 		}
 
 		const parentEvent = this.event;
