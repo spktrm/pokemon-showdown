@@ -133,8 +133,19 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 // so `effect[callbackName]` is a megamorphic load, and handler search was about a
 // third of simulation time when profiled. An effect's handlers are fixed at
 // construction. NO_CALLBACK marks one it lacks, apart from one it holds as null.
+// They're kept by name and then by effect, so that a search for one name through
+// many effects only looks up the name once.
 const NO_CALLBACK = {};
-const effectCallbacks = new WeakMap<object, Map<string, unknown>>();
+const callbacksByName = new Map<string, WeakMap<object, unknown>>();
+
+function callbacksNamed(callbackName: string) {
+	let callbacks = callbacksByName.get(callbackName);
+	if (callbacks === undefined) {
+		callbacks = new WeakMap();
+		callbacksByName.set(callbackName, callbacks);
+	}
+	return callbacks;
+}
 
 // The current request state of the Battle:
 //
@@ -1062,19 +1073,17 @@ export class Battle {
 		return handler;
 	}
 
-	getCallback(target: Pokemon | Side | Field | Battle, effect: Effect, callbackName: string) {
-		let callbacks = effectCallbacks.get(effect);
-		if (callbacks === undefined) {
-			callbacks = new Map();
-			effectCallbacks.set(effect, callbacks);
+	getCallback(
+		target: Pokemon | Side | Field | Battle, effect: Effect, callbackName: string,
+		callbacks = callbacksNamed(callbackName)
+	) {
+		let found = callbacks.get(effect);
+		if (found === undefined) {
 			// effects not built from a BasicEffect (made by some mods) define callbacks too
 			addDefinedCallbackNames(effect);
-		}
-		let found = callbacks.get(callbackName);
-		if (found === undefined) {
 			found = (effect as any)[callbackName];
 			if (found === undefined) found = NO_CALLBACK;
-			callbacks.set(callbackName, found);
+			callbacks.set(effect, found);
 		}
 		let callback = found as Function | undefined;
 		if (found === NO_CALLBACK) callback = undefined;
@@ -1172,9 +1181,10 @@ export class Battle {
 	findPokemonEventHandlers(pokemon: Pokemon, callbackName: string, getKey?: 'duration') {
 		const handlers: EventListener[] = [];
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
+		const callbacks = callbacksNamed(callbackName);
 
 		const status = pokemon.getStatus();
-		let callback = this.getCallback(pokemon, status, callbackName);
+		let callback = this.getCallback(pokemon, status, callbackName, callbacks);
 		if (callback !== undefined || (getKey && pokemon.statusState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: status, callback, state: pokemon.statusState, end: pokemon.clearStatus, effectHolder: pokemon,
@@ -1183,7 +1193,7 @@ export class Battle {
 		for (const id in pokemon.volatiles) {
 			const volatileState = pokemon.volatiles[id];
 			const volatile = this.dex.conditions.getByID(id as ID);
-			callback = this.getCallback(pokemon, volatile, callbackName);
+			callback = this.getCallback(pokemon, volatile, callbackName, callbacks);
 			if (callback !== undefined || (getKey && volatileState[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: volatile, callback, state: volatileState, end: pokemon.removeVolatile, effectHolder: pokemon,
@@ -1191,21 +1201,21 @@ export class Battle {
 			}
 		}
 		const ability = pokemon.getAbility();
-		callback = this.getCallback(pokemon, ability, callbackName);
+		callback = this.getCallback(pokemon, ability, callbackName, callbacks);
 		if (callback !== undefined || (getKey && pokemon.abilityState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: ability, callback, state: pokemon.abilityState, end: pokemon.clearAbility, effectHolder: pokemon,
 			}, callbackName));
 		}
 		const item = pokemon.getItem();
-		callback = this.getCallback(pokemon, item, callbackName);
+		callback = this.getCallback(pokemon, item, callbackName, callbacks);
 		if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
 			}, callbackName));
 		}
 		const species = pokemon.baseSpecies;
-		callback = this.getCallback(pokemon, species, callbackName);
+		callback = this.getCallback(pokemon, species, callbackName, callbacks);
 		if (callback !== undefined) {
 			handlers.push(this.resolvePriority({
 				effect: species, callback, state: pokemon.speciesState, end() {}, effectHolder: pokemon,
@@ -1215,7 +1225,7 @@ export class Battle {
 		for (const conditionid in side.slotConditions[pokemon.position]) {
 			const slotConditionState = side.slotConditions[pokemon.position][conditionid];
 			const slotCondition = this.dex.conditions.getByID(conditionid as ID);
-			callback = this.getCallback(pokemon, slotCondition, callbackName);
+			callback = this.getCallback(pokemon, slotCondition, callbackName, callbacks);
 			if (callback !== undefined || (getKey && slotConditionState[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: slotCondition,
@@ -1257,12 +1267,13 @@ export class Battle {
 	findFieldEventHandlers(field: Field, callbackName: string, getKey?: 'duration', customHolder?: Pokemon) {
 		const handlers: EventListener[] = [];
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
+		const callbacks = callbacksNamed(callbackName);
 
 		let callback;
 		for (const id in field.pseudoWeather) {
 			const pseudoWeatherState = field.pseudoWeather[id];
 			const pseudoWeather = this.dex.conditions.getByID(id as ID);
-			callback = this.getCallback(field, pseudoWeather, callbackName);
+			callback = this.getCallback(field, pseudoWeather, callbackName, callbacks);
 			if (callback !== undefined || (getKey && pseudoWeatherState[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: pseudoWeather, callback, state: pseudoWeatherState,
@@ -1271,7 +1282,7 @@ export class Battle {
 			}
 		}
 		const weather = field.getWeather();
-		callback = this.getCallback(field, weather, callbackName);
+		callback = this.getCallback(field, weather, callbackName, callbacks);
 		if (callback !== undefined || (getKey && this.field.weatherState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: weather, callback, state: this.field.weatherState,
@@ -1279,7 +1290,7 @@ export class Battle {
 			}, callbackName));
 		}
 		const terrain = field.getTerrain();
-		callback = this.getCallback(field, terrain, callbackName);
+		callback = this.getCallback(field, terrain, callbackName, callbacks);
 		if (callback !== undefined || (getKey && field.terrainState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: terrain, callback, state: field.terrainState,
@@ -1293,11 +1304,12 @@ export class Battle {
 	findSideEventHandlers(side: Side, callbackName: string, getKey?: 'duration', customHolder?: Pokemon) {
 		const handlers: EventListener[] = [];
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
+		const callbacks = callbacksNamed(callbackName);
 
 		for (const id in side.sideConditions) {
 			const sideConditionData = side.sideConditions[id];
 			const sideCondition = this.dex.conditions.getByID(id as ID);
-			const callback = this.getCallback(side, sideCondition, callbackName);
+			const callback = this.getCallback(side, sideCondition, callbackName, callbacks);
 			if (callback !== undefined || (getKey && sideConditionData[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: sideCondition, callback, state: sideConditionData,
