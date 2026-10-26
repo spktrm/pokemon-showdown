@@ -273,10 +273,11 @@ export const State = new class {
 	serializeActiveMove(move: ActiveMove, battle: Battle): /* ActiveMove */ AnyObject {
 		const base = battle.dex.moves.get(move.id);
 		const skip = new Set(ACTIVE_MOVE);
-		for (const [key, value] of Object.entries(base)) {
+		for (const key in base) {
 			// This should really be a deepEquals check to see if anything on ActiveMove was
 			// modified from the base Move, but that ends up being expensive and mostly unnecessary
 			// as ActiveMove currently only mutates its simple fields (eg. `type`, `target`) anyway.
+			const value = (base as AnyObject)[key];
 			// @ts-expect-error index signature
 			if (typeof value === 'object' || move[key] === value) skip.add(key);
 		}
@@ -304,8 +305,8 @@ export const State = new class {
 			if (obj === null) return null;
 			if (Array.isArray(obj)) {
 				const arr = new Array(obj.length);
-				for (const [i, o] of obj.entries()) {
-					arr[i] = this.serializeWithRefs(o, battle);
+				for (let i = 0; i < obj.length; i++) {
+					arr[i] = this.serializeWithRefs(obj[i], battle);
 				}
 				return arr;
 			}
@@ -323,8 +324,8 @@ export const State = new class {
 			}
 
 			const o: any = {};
-			for (const [key, value] of Object.entries(obj)) {
-				o[key] = this.serializeWithRefs(value, battle);
+			for (const key in obj) {
+				o[key] = this.serializeWithRefs((obj as AnyObject)[key], battle);
 			}
 			return o;
 		default:
@@ -344,8 +345,8 @@ export const State = new class {
 			if (obj === null) return null;
 			if (Array.isArray(obj)) {
 				const arr = new Array(obj.length);
-				for (const [i, o] of obj.entries()) {
-					arr[i] = this.deserializeWithRefs(o, battle);
+				for (let i = 0; i < obj.length; i++) {
+					arr[i] = this.deserializeWithRefs(obj[i], battle);
 				}
 				return arr;
 			}
@@ -353,8 +354,8 @@ export const State = new class {
 			if (this.isActiveMove(obj)) return this.deserializeActiveMove(obj, battle);
 
 			const o: any = {};
-			for (const [key, value] of Object.entries(obj)) {
-				o[key] = this.deserializeWithRefs(value, battle);
+			for (const key in obj) {
+				o[key] = this.deserializeWithRefs((obj as AnyObject)[key], battle);
 			}
 			return o;
 		case 'function': // lol wtf
@@ -410,9 +411,9 @@ export const State = new class {
 
 	serialize(obj: object, skip: Set<string>, battle: Battle): AnyObject {
 		const state: AnyObject = {};
-		for (const [key, value] of Object.entries(obj)) {
+		for (const key in obj) {
 			if (skip.has(key)) continue;
-			const val = this.serializeWithRefs(value, battle);
+			const val = this.serializeWithRefs((obj as AnyObject)[key], battle);
 			// JSON.stringify will get rid of keys with undefined values anyway, but
 			// we also do it here so that assert.deepEqual works on battle.toJSON().
 			if (typeof val !== 'undefined') state[key] = val;
@@ -421,10 +422,10 @@ export const State = new class {
 	}
 
 	deserialize(state: AnyObject, obj: object, skip: Set<string>, battle: Battle) {
-		for (const [key, value] of Object.entries(state)) {
+		for (const key in state) {
 			if (skip.has(key)) continue;
 			// @ts-expect-error index signature
-			obj[key] = this.deserializeWithRefs(value, battle);
+			obj[key] = this.deserializeWithRefs(state[key], battle);
 		}
 	}
 };
