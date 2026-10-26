@@ -43,6 +43,24 @@ describe('State', () => {
 			control.destroy();
 			test.destroy();
 		});
+		it('should be able to be restored more than once from the same state', () => {
+			const battle = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, TEAMS);
+			battle.makeChoices();
+			const state = battle.toJSON();
+			const serialized = JSON.stringify(state);
+			const first = Battle.fromJSON(state);
+			const second = Battle.fromJSON(state);
+			for (let i = 0; i < 3; i++) {
+				first.makeChoices();
+				second.makeChoices();
+			}
+
+			assert.equal(JSON.stringify(state), serialized);
+			assert.deepEqual(State.normalize(first.toJSON()), State.normalize(second.toJSON()));
+			battle.destroy();
+			first.destroy();
+			second.destroy();
+		});
 		it('should require special treatment for complex objects', () => {
 			const battle = common.createBattle(TEAMS);
 			battle.foo = new Map();
