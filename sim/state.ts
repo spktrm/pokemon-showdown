@@ -15,6 +15,7 @@ import { Field } from './field';
 import { Pokemon } from './pokemon';
 import { PRNG } from './prng';
 import { type Choice, Side } from './side';
+import { Utils } from '../lib/utils';
 
 // The simulator supports up to 24 different Pokemon on a team. Serialization
 // uses letters instead of numbers to indicate indices/positions, but where
@@ -84,6 +85,9 @@ export const State = new class {
 	deserializeBattle(serialized: string | /* Battle */ AnyObject): Battle {
 		const state: /* Battle */ AnyObject =
 			typeof serialized === 'string' ? JSON.parse(serialized) : serialized;
+		// A state we didn't parse ourselves might be restored from again, so the Battle
+		// can't keep the parts of it that it changes (the log and the Pokemon's sets).
+		const parsed = typeof serialized === 'string';
 		const options = {
 			formatid: state.formatid,
 			seed: state.prngSeed,
@@ -106,7 +110,10 @@ export const State = new class {
 			options[side.id] = {
 				name: side.name,
 				avatar: side.avatar,
-				team: team.map((p: string) => side.pokemon[Number(p) - 1].set),
+				team: team.map((p: string) => {
+					const set = side.pokemon[Number(p) - 1].set;
+					return parsed ? set : Utils.deepClone(set);
+				}),
 			};
 		}
 		// We create the Battle, allowing it to instantiate the Field/Side/Pokemon
@@ -150,7 +157,7 @@ export const State = new class {
 		const queue = this.deserializeWithRefs(state.queue, battle);
 		battle.queue.list = queue;
 		(battle as any).hints = new Set(state.hints);
-		(battle as any).log = state.log;
+		(battle as any).log = parsed ? state.log : state.log.slice();
 		return battle;
 	}
 
@@ -222,8 +229,8 @@ export const State = new class {
 	}
 
 	deserializePokemon(state: /* Pokemon */ AnyObject, pokemon: Pokemon) {
+		// pokemon.set is already state.set (or a copy of it), from the team the Battle was created with
 		this.deserialize(state, pokemon, POKEMON, pokemon.battle);
-		(pokemon as any).set = state.set;
 		// baseMoveSlots and moveSlots need to point to the same objects (ie. identity, not equality).
 		// If we serialized the baseMoveSlots, replace any that match moveSlots to preserve the
 		// identity relationship requirement.
