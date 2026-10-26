@@ -735,8 +735,9 @@ export class DexFormats {
 		name = (name || '').trim();
 		let id = toID(name);
 
-		if (!name.includes('@@@')) {
-			const ruleset = this.rulesetCache.get(id);
+		const cacheID = name.includes('@@@') ? null : id;
+		if (cacheID) {
+			const ruleset = this.rulesetCache.get(cacheID);
 			if (ruleset) return ruleset;
 		}
 
@@ -768,6 +769,8 @@ export class DexFormats {
 		let effect;
 		if (this.dex.data.Rulesets.hasOwnProperty(id)) {
 			effect = new Format({ name, ...this.dex.data.Rulesets[id] as any, ...supplementaryAttributes });
+			// rules aren't cached when formats are loaded, so cache them the first time they're looked up
+			if (cacheID) this.rulesetCache.set(cacheID, effect);
 		} else {
 			effect = new Format({ id, name, exists: false });
 		}
