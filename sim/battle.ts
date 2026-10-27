@@ -2662,6 +2662,7 @@ export class Battle {
 			faintData = this.faintQueue.shift()!;
 			const pokemon: Pokemon = faintData.target;
 			if (!pokemon.fainted && this.runEvent('BeforeFaint', pokemon, faintData.source, faintData.effect)) {
+				const illusion = pokemon.illusion;
 				if (this.gen <= 4 && !faintData.faintEventDone) {
 					this.runEvent('Faint', pokemon, faintData.source, faintData.effect);
 				}
@@ -2687,7 +2688,7 @@ export class Battle {
 				if (pokemon.formeRegression) {
 					// after clearing volatiles
 					pokemon.details = pokemon.getUpdatedDetails();
-					this.add('detailschange', pokemon, pokemon.details, '[silent]');
+					if (!illusion) this.add('detailschange', pokemon, pokemon.details, '[silent]');
 					pokemon.updateMaxHp();
 					pokemon.formeRegression = false;
 				}
