@@ -1184,8 +1184,9 @@ export class Battle {
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
 		const callbacks = callbacksNamed(callbackName);
 
+		// an empty status or item has no callbacks
 		const status = pokemon.getStatus();
-		let callback = this.getCallback(pokemon, status, callbackName, callbacks);
+		let callback = pokemon.status ? this.getCallback(pokemon, status, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && pokemon.statusState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: status, callback, state: pokemon.statusState, end: pokemon.clearStatus, effectHolder: pokemon,
@@ -1209,7 +1210,7 @@ export class Battle {
 			}, callbackName));
 		}
 		const item = pokemon.getItem();
-		callback = this.getCallback(pokemon, item, callbackName, callbacks);
+		callback = pokemon.item ? this.getCallback(pokemon, item, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
@@ -1283,8 +1284,9 @@ export class Battle {
 				}, callbackName));
 			}
 		}
+		// an empty weather or terrain has no callbacks
 		const weather = field.getWeather();
-		callback = this.getCallback(field, weather, callbackName, callbacks);
+		callback = field.weather ? this.getCallback(field, weather, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && this.field.weatherState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: weather, callback, state: this.field.weatherState,
@@ -1292,7 +1294,7 @@ export class Battle {
 			}, callbackName));
 		}
 		const terrain = field.getTerrain();
-		callback = this.getCallback(field, terrain, callbackName, callbacks);
+		callback = field.terrain ? this.getCallback(field, terrain, callbackName, callbacks) : undefined;
 		if (callback !== undefined || (getKey && field.terrainState[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: terrain, callback, state: field.terrainState,
