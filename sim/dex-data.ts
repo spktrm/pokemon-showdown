@@ -66,10 +66,14 @@ export interface ModdedEffectText {
  * battle can skip looking for it. Only grows.
  */
 export const definedCallbackNames = new Set<string>(['onSwitchIn']);
+/** Callback names that any species defines. */
+export const speciesCallbackNames = new Set<string>();
+/** Callback names that any format or rule defines. */
+export const formatCallbackNames = new Set<string>();
 
-export function addDefinedCallbackNames(data: AnyObject) {
+export function addDefinedCallbackNames(data: AnyObject, names = definedCallbackNames) {
 	for (const key in data) {
-		if (key.startsWith('on')) definedCallbackNames.add(key);
+		if (key.startsWith('on')) names.add(key);
 	}
 }
 

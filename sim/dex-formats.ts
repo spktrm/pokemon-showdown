@@ -1,5 +1,5 @@
 import { Utils } from '../lib/utils';
-import { assignMissingFields, toID, BasicEffect } from './dex-data';
+import { assignMissingFields, toID, BasicEffect, addDefinedCallbackNames, formatCallbackNames } from './dex-data';
 import type { EventMethods } from './dex-conditions';
 import type { SpeciesData } from './dex-species';
 import { Tags } from '../data/tags';
@@ -518,6 +518,7 @@ export class Format extends BasicEffect implements Readonly<BasicEffect> {
 
 	constructor(data: AnyObject) {
 		super(data);
+		addDefinedCallbackNames(data, formatCallbackNames);
 
 		this.mod = Utils.getString(data.mod) || 'gen9';
 		this.effectType = Utils.getString(data.effectType) as FormatEffectType || 'Condition';

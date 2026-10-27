@@ -15,7 +15,7 @@
  */
 
 import { Dex, toID } from './dex';
-import { addDefinedCallbackNames, definedCallbackNames } from './dex-data';
+import { addDefinedCallbackNames, definedCallbackNames, formatCallbackNames, speciesCallbackNames } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -1215,7 +1215,8 @@ export class Battle {
 			}, callbackName));
 		}
 		const species = pokemon.baseSpecies;
-		callback = this.getCallback(pokemon, species, callbackName, callbacks);
+		callback = speciesCallbackNames.has(callbackName) ?
+			this.getCallback(pokemon, species, callbackName, callbacks) : undefined;
 		if (callback !== undefined) {
 			handlers.push(this.resolvePriority({
 				effect: species, callback, state: pokemon.speciesState, end() {}, effectHolder: pokemon,
@@ -1246,7 +1247,7 @@ export class Battle {
 
 		let callback;
 		const format = this.format;
-		if (getKey || definedCallbackNames.has(callbackName)) callback = this.getCallback(this, format, callbackName);
+		if (getKey || formatCallbackNames.has(callbackName)) callback = this.getCallback(this, format, callbackName);
 		if (callback !== undefined || (getKey && this.formatData[getKey])) {
 			handlers.push(this.resolvePriority({
 				effect: format, callback, state: this.formatData, end: null, effectHolder: customHolder || this,
