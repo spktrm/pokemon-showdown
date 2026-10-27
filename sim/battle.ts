@@ -15,7 +15,7 @@
  */
 
 import { Dex, toID } from './dex';
-import { addDefinedCallbackNames, definedCallbackNames } from './dex-data';
+import { definedCallbackNames } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -1079,14 +1079,11 @@ export class Battle {
 	) {
 		let found = callbacks.get(effect);
 		if (found === undefined) {
-			// effects not built from a BasicEffect (made by some mods) define callbacks too
-			addDefinedCallbackNames(effect);
 			found = (effect as any)[callbackName];
 			if (found === undefined) found = NO_CALLBACK;
 			callbacks.set(effect, found);
 		}
-		let callback = found as Function | undefined;
-		if (found === NO_CALLBACK) callback = undefined;
+		let callback = (found === NO_CALLBACK ? undefined : found) as Function | undefined;
 		// Abilities and items Start at different times during the SwitchIn event, so we run their onStart handlers
 		// during the SwitchIn event instead of running the Start event during switch-ins
 		if (target instanceof Pokemon && callbackName === 'onSwitchIn') {
