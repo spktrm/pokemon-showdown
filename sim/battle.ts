@@ -1742,12 +1742,13 @@ export class Battle {
 
 				pokemon.trapped = pokemon.maybeTrapped = false;
 				this.runEvent('TrapPokemon', pokemon);
-				if (!pokemon.knownType || this.dex.getImmunity('trapped', pokemon)) {
+				const canBeTrapped = !pokemon.knownType || this.dex.getImmunity('trapped', pokemon);
+				if (canBeTrapped) {
 					this.runEvent('MaybeTrapPokemon', pokemon);
 				}
 				// canceling switches would leak information
 				// if a foe might have a trapping ability
-				if (this.gen > 2) {
+				if (this.gen > 2 && canBeTrapped) {
 					for (const source of pokemon.foes()) {
 						const species = (source.illusion || source).species;
 						if (!species.abilities) continue;
@@ -1768,7 +1769,6 @@ export class Battle {
 							}
 							const ability = this.dex.abilities.get(abilityName);
 							if (ruleTable.has('-ability:' + ability.id)) continue;
-							if (pokemon.knownType && !this.dex.getImmunity('trapped', pokemon)) continue;
 							this.singleEvent('FoeMaybeTrapPokemon', ability, {}, pokemon, source);
 						}
 					}
