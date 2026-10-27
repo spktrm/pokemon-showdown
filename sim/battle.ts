@@ -838,6 +838,15 @@ export class Battle {
 				}, `on${eventid}`));
 			}
 		}
+		if (!handlers.length) {
+			// nothing to run, so return what the event would have returned
+			if (relayVar === undefined || relayVar === null) relayVar = true;
+			if (Array.isArray(target)) return Array.isArray(relayVar) ? relayVar : target.map(() => true);
+			if (typeof relayVar === 'number' && relayVar === Math.abs(Math.floor(relayVar))) {
+				relayVar = this.modify(relayVar, 1);
+			}
+			return relayVar;
+		}
 
 		if (['Invulnerability', 'TryHit', 'DamagingHit', 'EntryHazard'].includes(eventid)) {
 			handlers.sort(Battle.compareLeftToRightOrder);
