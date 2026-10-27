@@ -1027,7 +1027,7 @@ export class Battle {
 
 		// Abilities and items Start at different times during the SwitchIn event, so we run their onStart handlers
 		// during the SwitchIn event instead of running the Start event during switch-ins
-		if (target instanceof Pokemon && callbackName === 'onSwitchIn') {
+		if (callbackName === 'onSwitchIn' && target instanceof Pokemon) {
 			if (callback === undefined && !(effect as any).onAnySwitchIn && (
 				['Ability', 'Item'].includes(effect.effectType) ||
 				(effect.effectType === 'Status' && ['ability', 'item'].includes(effect.id.split(':')[0]))
