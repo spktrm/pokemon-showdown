@@ -766,6 +766,8 @@ export class ModdedDex {
 			for (const id in table) {
 				Data.addDefinedCallbackNames(table[id]);
 				if (table[id].condition) Data.addDefinedCallbackNames(table[id].condition);
+				if (dataType === 'Pokedex') Data.addDefinedCallbackNames(table[id], Data.speciesCallbackNames);
+				if (dataType === 'Rulesets') Data.addDefinedCallbackNames(table[id], Data.formatCallbackNames);
 			}
 		}
 
