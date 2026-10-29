@@ -1,5 +1,7 @@
 import type { PokemonEventMethods, ConditionData, ModdedConditionData } from './dex-conditions';
-import { assignMissingFields, BasicEffect, toID, type ModdedEffectText } from './dex-data';
+import {
+	assignMissingFields, BasicEffect, toID, type ModdedEffectText, addDefinedCallbackNames, abilityCallbackNames,
+} from './dex-data';
 import { Utils } from '../lib/utils';
 
 interface AbilityEventMethods {
@@ -42,6 +44,7 @@ export class Ability extends BasicEffect implements Readonly<BasicEffect> {
 
 	constructor(data: AnyObject) {
 		super(data);
+		addDefinedCallbackNames(data, abilityCallbackNames);
 
 		this.fullname = `ability: ${this.name}`;
 		this.effectType = 'Ability';
