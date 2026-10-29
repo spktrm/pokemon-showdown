@@ -107,6 +107,13 @@ interface EventCallbackNames {
 	any: string;
 	source: string;
 	prefixed: boolean;
+	hasOn: boolean;
+	hasAlly: boolean;
+	hasFoe: boolean;
+	hasAny: boolean;
+	hasSource: boolean;
+	// the size of definedCallbackNames when the has* flags were set
+	definedCount: number;
 }
 
 // Each event's callback names, built once: the same string objects are reused,
@@ -123,8 +130,19 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 			any: `onAny${eventName}`,
 			source: `onSource${eventName}`,
 			prefixed: !UNPREFIXED_EVENTS.has(eventName),
+			hasOn: false, hasAlly: false, hasFoe: false, hasAny: false, hasSource: false,
+			definedCount: -1,
 		};
 		eventCallbackNames.set(eventName, names);
+	}
+	if (names.definedCount !== definedCallbackNames.size) {
+		const defined = definedCallbackNames;
+		names.hasOn = defined.has(names.on);
+		names.hasAlly = names.prefixed && defined.has(names.ally);
+		names.hasFoe = names.prefixed && defined.has(names.foe);
+		names.hasAny = names.prefixed && defined.has(names.any);
+		names.hasSource = names.prefixed && defined.has(names.source);
+		names.definedCount = defined.size;
 	}
 	return names;
 }
@@ -1123,15 +1141,9 @@ export class Battle {
 			return handlers;
 		}
 		const callbackNames = callbackNamesOf(eventName);
-		const defined = definedCallbackNames;
-		const hasOn = defined.has(callbackNames.on);
+		const { hasOn, hasAlly, hasFoe, hasAny, hasSource } = callbackNames;
 		// events that target a Pokemon normally bubble up to the Side
 		const shouldBubbleDown = target instanceof Side;
-		const prefixedHandlers = callbackNames.prefixed;
-		const hasAlly = prefixedHandlers && defined.has(callbackNames.ally);
-		const hasFoe = prefixedHandlers && defined.has(callbackNames.foe);
-		const hasAny = prefixedHandlers && defined.has(callbackNames.any);
-		const hasSource = prefixedHandlers && defined.has(callbackNames.source);
 		if (target instanceof Pokemon && (target.isActive || source?.isActive)) {
 			if (hasOn) handlers = this.findPokemonEventHandlers(target, callbackNames.on);
 			if (hasAlly || hasAny) {
