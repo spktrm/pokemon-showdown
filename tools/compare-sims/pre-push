@@ -1,0 +1,19 @@
+#!/bin/bash
+# Git pre-push hook: before `latest` is pushed to the spktrm fork, checks that the commit being
+# pushed plays the comparison battles exactly like upstream, and stops the push if it doesn't.
+# Install it with: ln -s ../../tools/compare-sims/pre-push .git/hooks/pre-push
+# Push without the check once with: git push --no-verify
+[[ $2 == *spktrm/pokemon-showdown* ]] || exit 0
+repo=$(git rev-parse --show-toplevel)
+status=0
+while read -r _ local_sha remote_ref _; do
+	[ "$remote_ref" = refs/heads/latest ] || continue
+	# deleting the branch
+	[[ $local_sha =~ ^0+$ ]] && continue
+	echo "pre-push: checking $local_sha against upstream"
+	OURS_REF=$local_sha "$repo/tools/compare-sims/compare-upstream.sh" < /dev/null || status=1
+done
+if [ $status != 0 ]; then
+	echo "pre-push: battles differ from upstream, so latest wasn't pushed (git push --no-verify pushes anyway)"
+fi
+exit $status
