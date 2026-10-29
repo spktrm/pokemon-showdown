@@ -70,6 +70,10 @@ export const definedCallbackNames = new Set<string>(['onSwitchIn']);
 export const speciesCallbackNames = new Set<string>();
 /** Callback names that any format or rule defines. */
 export const formatCallbackNames = new Set<string>();
+/** Callback names that any ability defines (abilities without onSwitchIn run onStart instead). */
+export const abilityCallbackNames = new Set<string>(['onSwitchIn']);
+/** Callback names that any item defines (items without onSwitchIn run onStart instead). */
+export const itemCallbackNames = new Set<string>(['onSwitchIn']);
 
 export function addDefinedCallbackNames(data: AnyObject, names = definedCallbackNames) {
 	for (const key in data) {

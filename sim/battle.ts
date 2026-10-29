@@ -15,7 +15,10 @@
  */
 
 import { Dex, toID } from './dex';
-import { addDefinedCallbackNames, definedCallbackNames, formatCallbackNames, speciesCallbackNames } from './dex-data';
+import {
+	abilityCallbackNames, addDefinedCallbackNames, definedCallbackNames, formatCallbackNames, itemCallbackNames,
+	speciesCallbackNames,
+} from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -1200,19 +1203,23 @@ export class Battle {
 				}, callbackName));
 			}
 		}
-		const ability = pokemon.getAbility();
-		callback = this.getCallback(pokemon, ability, callbackName, callbacks);
-		if (callback !== undefined || (getKey && pokemon.abilityState[getKey])) {
-			handlers.push(this.resolvePriority({
-				effect: ability, callback, state: pokemon.abilityState, end: pokemon.clearAbility, effectHolder: pokemon,
-			}, callbackName));
+		if (abilityCallbackNames.has(callbackName) || (getKey && pokemon.abilityState[getKey])) {
+			const ability = pokemon.getAbility();
+			callback = this.getCallback(pokemon, ability, callbackName, callbacks);
+			if (callback !== undefined || (getKey && pokemon.abilityState[getKey])) {
+				handlers.push(this.resolvePriority({
+					effect: ability, callback, state: pokemon.abilityState, end: pokemon.clearAbility, effectHolder: pokemon,
+				}, callbackName));
+			}
 		}
-		const item = pokemon.getItem();
-		callback = this.getCallback(pokemon, item, callbackName, callbacks);
-		if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
-			handlers.push(this.resolvePriority({
-				effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
-			}, callbackName));
+		if (itemCallbackNames.has(callbackName) || (getKey && pokemon.itemState[getKey])) {
+			const item = pokemon.getItem();
+			callback = this.getCallback(pokemon, item, callbackName, callbacks);
+			if (callback !== undefined || (getKey && pokemon.itemState[getKey])) {
+				handlers.push(this.resolvePriority({
+					effect: item, callback, state: pokemon.itemState, end: pokemon.clearItem, effectHolder: pokemon,
+				}, callbackName));
+			}
 		}
 		const species = pokemon.baseSpecies;
 		callback = speciesCallbackNames.has(callbackName) ?

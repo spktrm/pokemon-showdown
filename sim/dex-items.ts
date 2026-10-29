@@ -1,5 +1,7 @@
 import type { PokemonEventMethods, ConditionData, ModdedConditionData } from './dex-conditions';
-import { assignMissingFields, BasicEffect, toID, type ModdedEffectText } from './dex-data';
+import {
+	assignMissingFields, BasicEffect, toID, type ModdedEffectText, addDefinedCallbackNames, itemCallbackNames,
+} from './dex-data';
 import { Utils } from '../lib/utils';
 
 interface FlingData {
@@ -105,6 +107,7 @@ export class Item extends BasicEffect implements Readonly<BasicEffect> {
 
 	constructor(data: AnyObject) {
 		super(data);
+		addDefinedCallbackNames(data, itemCallbackNames);
 
 		this.fullname = `item: ${this.name}`;
 		this.effectType = 'Item';
