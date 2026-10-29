@@ -668,6 +668,9 @@ export class Battle {
 			relayVar = true;
 			hasRelayVar = false;
 		}
+		// effects that don't handle this event have nothing to suppress
+		const callback = customCallback || (effect as any)[`on${eventid}`];
+		if (callback === undefined) return relayVar;
 
 		if (effect.effectType === 'Status' && (target instanceof Pokemon) && target.status !== effect.id) {
 			// it's changed; call it off
@@ -694,9 +697,6 @@ export class Battle {
 			this.debug(eventid + ' handler suppressed by Air Lock');
 			return relayVar;
 		}
-
-		const callback = customCallback || (effect as any)[`on${eventid}`];
-		if (callback === undefined) return relayVar;
 
 		const parentEffect = this.effect;
 		const parentEffectState = this.effectState;
