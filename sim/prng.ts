@@ -12,7 +12,6 @@
  * @license MIT license
  */
 
-import { Chacha20 } from 'ts-chacha20';
 import { Utils } from '../lib/utils';
 
 export type PRNGSeed = `${'sodium' | 'gen5' | number},${string}`;
@@ -170,8 +169,8 @@ export class PRNG {
 
 /**
  * This is a drop-in replacement for libsodium's randombytes_buf_deterministic,
- * but it's implemented with ts-chacha20 instead, for a smaller dependency that
- * doesn't use NodeJS native modules, for better portability.
+ * but it's implemented in plain JS instead, so it doesn't need NodeJS native
+ * modules, for better portability.
  */
 export class SodiumRNG implements RNG {
 	// nonce chosen to be compatible with libsodium's randombytes_buf_deterministic
@@ -196,15 +195,67 @@ export class SodiumRNG implements RNG {
 	}
 
 	next() {
-		const zeroBuf = new Uint8Array(36);
-		// tested to do the exact same thing as
-		// sodium.randombytes_buf_deterministic(buf, this.seed);
-		const buf = new Chacha20(this.seed, SodiumRNG.NONCE).encrypt(zeroBuf);
+		// This is the first ChaCha20 block for the seed, which is what
+		// sodium.randombytes_buf_deterministic(buf, this.seed) gives for 36 bytes.
+		// It's kept in local variables because that's much faster than using arrays.
+		const seed = this.seed;
+		const k0 = readUint32LE(seed, 0), k1 = readUint32LE(seed, 4), k2 = readUint32LE(seed, 8);
+		const k3 = readUint32LE(seed, 12), k4 = readUint32LE(seed, 16), k5 = readUint32LE(seed, 20);
+		const k6 = readUint32LE(seed, 24), k7 = readUint32LE(seed, 28);
+		let x0 = 0x61707865, x1 = 0x3320646e, x2 = 0x79622d32, x3 = 0x6b206574;
+		let x4 = k0, x5 = k1, x6 = k2, x7 = k3, x8 = k4, x9 = k5, x10 = k6, x11 = k7;
+		let x12 = 0, x13 = NONCE0, x14 = NONCE1, x15 = NONCE2;
+		for (let i = 0; i < 10; i++) {
+			// columns
+			x0 = x0 + x4 | 0; x12 = rotl(x12 ^ x0, 16);
+			x8 = x8 + x12 | 0; x4 = rotl(x4 ^ x8, 12);
+			x0 = x0 + x4 | 0; x12 = rotl(x12 ^ x0, 8);
+			x8 = x8 + x12 | 0; x4 = rotl(x4 ^ x8, 7);
+			x1 = x1 + x5 | 0; x13 = rotl(x13 ^ x1, 16);
+			x9 = x9 + x13 | 0; x5 = rotl(x5 ^ x9, 12);
+			x1 = x1 + x5 | 0; x13 = rotl(x13 ^ x1, 8);
+			x9 = x9 + x13 | 0; x5 = rotl(x5 ^ x9, 7);
+			x2 = x2 + x6 | 0; x14 = rotl(x14 ^ x2, 16);
+			x10 = x10 + x14 | 0; x6 = rotl(x6 ^ x10, 12);
+			x2 = x2 + x6 | 0; x14 = rotl(x14 ^ x2, 8);
+			x10 = x10 + x14 | 0; x6 = rotl(x6 ^ x10, 7);
+			x3 = x3 + x7 | 0; x15 = rotl(x15 ^ x3, 16);
+			x11 = x11 + x15 | 0; x7 = rotl(x7 ^ x11, 12);
+			x3 = x3 + x7 | 0; x15 = rotl(x15 ^ x3, 8);
+			x11 = x11 + x15 | 0; x7 = rotl(x7 ^ x11, 7);
+			// diagonals
+			x0 = x0 + x5 | 0; x15 = rotl(x15 ^ x0, 16);
+			x10 = x10 + x15 | 0; x5 = rotl(x5 ^ x10, 12);
+			x0 = x0 + x5 | 0; x15 = rotl(x15 ^ x0, 8);
+			x10 = x10 + x15 | 0; x5 = rotl(x5 ^ x10, 7);
+			x1 = x1 + x6 | 0; x12 = rotl(x12 ^ x1, 16);
+			x11 = x11 + x12 | 0; x6 = rotl(x6 ^ x11, 12);
+			x1 = x1 + x6 | 0; x12 = rotl(x12 ^ x1, 8);
+			x11 = x11 + x12 | 0; x6 = rotl(x6 ^ x11, 7);
+			x2 = x2 + x7 | 0; x13 = rotl(x13 ^ x2, 16);
+			x8 = x8 + x13 | 0; x7 = rotl(x7 ^ x8, 12);
+			x2 = x2 + x7 | 0; x13 = rotl(x13 ^ x2, 8);
+			x8 = x8 + x13 | 0; x7 = rotl(x7 ^ x8, 7);
+			x3 = x3 + x4 | 0; x14 = rotl(x14 ^ x3, 16);
+			x9 = x9 + x14 | 0; x4 = rotl(x4 ^ x9, 12);
+			x3 = x3 + x4 | 0; x14 = rotl(x14 ^ x3, 8);
+			x9 = x9 + x14 | 0; x4 = rotl(x4 ^ x9, 7);
+		}
 
 		// use the first 32 bytes for the next seed, and the next 4 bytes for the output
-		this.seed = buf.slice(0, 32);
+		const nextSeed = new Uint8Array(32);
+		writeUint32LE(nextSeed, 0, x0 + 0x61707865);
+		writeUint32LE(nextSeed, 4, x1 + 0x3320646e);
+		writeUint32LE(nextSeed, 8, x2 + 0x79622d32);
+		writeUint32LE(nextSeed, 12, x3 + 0x6b206574);
+		writeUint32LE(nextSeed, 16, x4 + k0);
+		writeUint32LE(nextSeed, 20, x5 + k1);
+		writeUint32LE(nextSeed, 24, x6 + k2);
+		writeUint32LE(nextSeed, 28, x7 + k3);
+		this.seed = nextSeed;
 		// reading big-endian
-		return buf.slice(32, 36).reduce((a, b) => a * 256 + b);
+		const out = x8 + k4;
+		return (out & 0xff) * 0x1000000 + ((out >>> 8 & 0xff) << 16 | (out >>> 16 & 0xff) << 8 | out >>> 24);
 	}
 
 	static generateSeed(): SodiumRNGSeed {
@@ -227,6 +278,22 @@ export class SodiumRNG implements RNG {
 		];
 	}
 }
+
+function rotl(x: number, n: number) {
+	return x << n | x >>> (32 - n);
+}
+function readUint32LE(buf: Uint8Array, i: number) {
+	return buf[i] | buf[i + 1] << 8 | buf[i + 2] << 16 | buf[i + 3] << 24;
+}
+function writeUint32LE(buf: Uint8Array, i: number, x: number) {
+	buf[i] = x;
+	buf[i + 1] = x >>> 8;
+	buf[i + 2] = x >>> 16;
+	buf[i + 3] = x >>> 24;
+}
+const NONCE0 = readUint32LE(SodiumRNG.NONCE, 0);
+const NONCE1 = readUint32LE(SodiumRNG.NONCE, 4);
+const NONCE2 = readUint32LE(SodiumRNG.NONCE, 8);
 
 /**
  * A PRNG intended to emulate the on-cartridge PRNG for Gen 5 with a 64-bit
