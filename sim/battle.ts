@@ -1871,6 +1871,8 @@ export class Battle {
 								continue;
 							}
 							const ability = this.dex.abilities.get(abilityName);
+							// only abilities like Shadow Tag can trap
+							if (!(ability as any).onFoeMaybeTrapPokemon) continue;
 							if (ruleTable.has('-ability:' + ability.id)) continue;
 							this.singleEvent('FoeMaybeTrapPokemon', ability, {}, pokemon, source);
 						}
