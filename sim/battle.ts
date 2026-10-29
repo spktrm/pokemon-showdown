@@ -1294,8 +1294,10 @@ export class Battle {
 		let callback;
 		for (const id in field.pseudoWeather) {
 			const pseudoWeatherState = field.pseudoWeather[id];
-			const pseudoWeather = this.dex.conditions.getByID(id as ID);
-			callback = this.getCallback(field, pseudoWeather, callbackName, callbacks);
+			// rules with event handlers are added as pseudo-weathers too, and only have callbacks some rule defines
+			const pseudoWeather = this.dex.conditions.getByID(id as ID) as Effect;
+			callback = pseudoWeather.effectType !== 'Rule' || formatCallbackNames.has(callbackName) ?
+				this.getCallback(field, pseudoWeather, callbackName, callbacks) : undefined;
 			if (callback !== undefined || (getKey && pseudoWeatherState[getKey])) {
 				handlers.push(this.resolvePriority({
 					effect: pseudoWeather, callback, state: pseudoWeatherState,
