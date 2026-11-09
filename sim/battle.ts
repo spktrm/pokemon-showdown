@@ -160,6 +160,8 @@ interface EventCallbackNames {
 	hasSource: boolean;
 	// the size of definedCallbackNames when the has* flags were set
 	definedCount: number;
+	// the names' numbers (see callbackNumberOf): on, ally, foe, any and source
+	numbers: number[];
 	// whether a battle's presentCallbacks has any of these names, and which bits those were
 	present: boolean;
 	presentIn: number[] | null;
@@ -180,8 +182,10 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 			prefixed: !UNPREFIXED_EVENTS.has(eventName),
 			hasOn: false, hasAlly: false, hasFoe: false, hasAny: false, hasSource: false,
 			definedCount: -1,
+			numbers: [],
 			present: true, presentIn: null,
 		};
+		names.numbers = [names.on, names.ally, names.foe, names.any, names.source].map(callbackNumberOf);
 		eventCallbackNames.set(eventName, names);
 	}
 	if (names.definedCount !== definedCallbackNames.size) {
@@ -1315,11 +1319,9 @@ export class Battle extends EmptyBase {
 		if (!this.hasPresentEffects()) this.findPresentCallbacks();
 		const bits = this.presentCallbacks;
 		if (callbackNames.presentIn !== bits) {
-			callbackNames.present = hasCallbackBit(bits, callbackNumberOf(callbackNames.on)) ||
-				hasCallbackBit(bits, callbackNumberOf(callbackNames.ally)) ||
-				hasCallbackBit(bits, callbackNumberOf(callbackNames.foe)) ||
-				hasCallbackBit(bits, callbackNumberOf(callbackNames.any)) ||
-				hasCallbackBit(bits, callbackNumberOf(callbackNames.source));
+			const numbers = callbackNames.numbers;
+			callbackNames.present = hasCallbackBit(bits, numbers[0]) || hasCallbackBit(bits, numbers[1]) ||
+				hasCallbackBit(bits, numbers[2]) || hasCallbackBit(bits, numbers[3]) || hasCallbackBit(bits, numbers[4]);
 			callbackNames.presentIn = bits;
 		}
 		return callbackNames.present;
