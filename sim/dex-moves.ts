@@ -612,12 +612,43 @@ export class DataMove extends BasicEffect implements Readonly<BasicEffect & Move
 	}
 }
 
+// Keys an ActiveMove can get during a battle that moves in the data might not have.
+const ACTIVE_MOVE_KEYS = [
+	'hit', 'moveHitData', 'hitTargets', 'ability', 'allies', 'auraBooster', 'causedCrashDamage', 'forceStatus',
+	'hasAuraBreak', 'hasBounced', 'hasSheerForce', 'isExternal', 'lastHit', 'magnitude', 'pranksterBoosted',
+	'selfDropped', 'selfSwitch', 'spreadHit', 'statusRoll', 'stellarBoosted', 'totalDamage', 'typeChangerBoosted',
+	'infiltrates', 'ruinedAtk', 'ruinedDef', 'ruinedSpA', 'ruinedSpD', 'isZOrMaxPowered', 'baseMove',
+];
+
+/**
+ * Builds the constructor DexMoves#getActive uses. It sets every key in `keys` on the copy, in
+ * that order, so all copies made by it share one hidden class (copying a move key by key leaves
+ * it a dictionary instead).
+ */
+function activeMoveConstructorFor(keys: string[], prototype: object): new (move: Move) => ActiveMove {
+	const lines = keys.map(key => {
+		const prop = /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${JSON.stringify(key)}]`;
+		if (key === 'hit') return `\tthis${prop} = 0;`;
+		return `\tv = move${prop}; this${prop} = typeof v === 'object' && v !== null ? deepClone(v) : v;`;
+	});
+	// oxlint-disable-next-line typescript/no-implied-eval
+	const ActiveMove = new Function('deepClone', `return function ActiveMove(move) {\n\tlet v;\n${lines.join('\n')}\n};`)(
+		Utils.deepClone
+	);
+	ActiveMove.prototype = prototype;
+	return ActiveMove;
+}
+
 const EMPTY_MOVE = Utils.deepFreeze(new DataMove({ name: '', exists: false }));
 
 export class DexMoves {
 	readonly dex: ModdedDex;
 	readonly moveCache = new Map<ID, Move>();
 	allCache: readonly Move[] | null = null;
+	activeMoveKeys: Set<string> | null = null;
+	activeMoveKeyList: string[] | null = null;
+	ActiveMove: (new (move: Move) => ActiveMove) | null = null;
+	readonly activeMoveTemplates = new WeakMap<Move, ActiveMove | null>();
 
 	constructor(dex: ModdedDex) {
 		this.dex = dex;
@@ -669,6 +700,47 @@ export class DexMoves {
 		}
 		if (move.exists) this.moveCache.set(id, this.dex.deepFreeze(move));
 		return move;
+	}
+
+	/**
+	 * A copy of a move to use in a battle, like `Utils.deepClone(move)` with `hit` set to 0,
+	 * except that it has every key any move in this dex has, set to undefined if the move
+	 * doesn't have it.
+	 */
+	getActive(move: Move): ActiveMove {
+		const template = this.activeMoveTemplate(move);
+		if (!template) {
+			const copy: ActiveMove = Utils.deepClone(move);
+			copy.hit = 0;
+			return copy;
+		}
+		return new this.ActiveMove!(template);
+	}
+
+	/** The copy ActiveMoves of `move` are made from, or null if they're made with Utils.deepClone. */
+	activeMoveTemplate(move: Move): ActiveMove | null {
+		let template = this.activeMoveTemplates.get(move);
+		if (template === undefined) {
+			if (!this.ActiveMove) {
+				const keys = new Set<string>();
+				for (const dexMove of this.all()) {
+					for (const key in dexMove) {
+						if (Object.prototype.hasOwnProperty.call(dexMove, key)) keys.add(key);
+					}
+				}
+				for (const key of ACTIVE_MOVE_KEYS) keys.add(key);
+				this.activeMoveKeys = keys;
+				this.activeMoveKeyList = [...keys];
+				this.ActiveMove = activeMoveConstructorFor(this.activeMoveKeyList, DataMove.prototype);
+			}
+			// copies are made from a copy of the move with the same hidden class, which is faster
+			// to read from than the move itself
+			const fits = Object.getPrototypeOf(move) === DataMove.prototype &&
+				Object.keys(move).every(key => this.activeMoveKeys!.has(key));
+			template = fits ? new this.ActiveMove(move) : null;
+			this.activeMoveTemplates.set(move, template);
+		}
+		return template;
 	}
 
 	all(): readonly Move[] {

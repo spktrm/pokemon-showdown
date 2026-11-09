@@ -12,6 +12,7 @@
 import { Battle } from './battle';
 import { Dex, type ModdedDex } from './dex';
 import { EmptyBase } from './dex-data';
+import type { DexMoves } from './dex-moves';
 import { Field } from './field';
 import { Pokemon } from './pokemon';
 import { PRNG } from './prng';
@@ -72,8 +73,13 @@ type PokemonFiller = (
 	copy: BattleCopy, state: typeof State
 ) => void;
 
+type ActiveMoveOverlay = (
+	source: ActiveMove, move: ActiveMove, template: ActiveMove, copy: BattleCopy, state: typeof State
+) => void;
+
 export const State = new class {
 	pokemonFillers: { keys: string[], fill: PokemonFiller }[] = [];
+	activeMoveOverlays = new WeakMap<DexMoves, ActiveMoveOverlay>();
 
 	// REFERABLE is used to determine which objects are of the Referable type by
 	// comparing their constructors. Unfortunately, we need to set this dynamically
@@ -366,6 +372,13 @@ export const State = new class {
 		const base = copy.dex.moves.get(source.id);
 		move = copy.dex.getActiveMove(base);
 		copy.moves.set(source, move);
+		// the template has the same values as the move, so comparing with it gives the same result
+		const template = copy.dex.moves.activeMoveTemplate(base);
+		const overlay = template && this.activeMoveOverlayFor(copy.dex.moves, source);
+		if (overlay) {
+			overlay(source, move, template, copy, this);
+			return move;
+		}
 		for (const key in source) {
 			const value = (source as AnyObject)[key];
 			const baseValue = (base as AnyObject)[key];
@@ -374,6 +387,34 @@ export const State = new class {
 			if (copied !== undefined) (move as AnyObject)[key] = copied;
 		}
 		return move;
+	}
+
+	/**
+	 * For an ActiveMove with exactly the keys DexMoves#getActive gives (in the same order), the loop
+	 * in cloneActiveMove is built once as code, which reads each key by name.
+	 */
+	activeMoveOverlayFor(moves: DexMoves, source: ActiveMove): ActiveMoveOverlay | null {
+		const keys = moves.activeMoveKeyList!;
+		let i = 0;
+		for (const key in source) {
+			if (keys[i++] !== key) return null;
+		}
+		if (i !== keys.length) return null;
+		let overlay = this.activeMoveOverlays.get(moves);
+		if (!overlay) {
+			const lines = [];
+			for (const key of keys) {
+				if (ACTIVE_MOVE.has(key)) continue;
+				const k = JSON.stringify(key);
+				lines.push(`b = t[${k}]; if (typeof b !== 'object' && (v = s[${k}]) !== b) ` +
+					`{ v = state.cloneWithRefs(v, copy); if (v !== undefined) m[${k}] = v; }`);
+			}
+			// the body only has the move keys, quoted with JSON.stringify
+			// oxlint-disable-next-line typescript/no-implied-eval
+			overlay = new Function('s', 'm', 't', 'copy', 'state', `let v, b;\n${lines.join('\n')}`) as ActiveMoveOverlay;
+			this.activeMoveOverlays.set(moves, overlay);
+		}
+		return overlay;
 	}
 
 	// like deserializeWithRefs(serializeWithRefs(obj)), but dex objects are shared rather than looked up again
