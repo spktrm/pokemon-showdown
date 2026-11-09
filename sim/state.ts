@@ -52,6 +52,9 @@ const POKEMON = new Set([
 	'happiness', 'level', 'pokeball', 'baseMoveSlots',
 ]);
 const CHOICE = new Set(['switchIns']);
+const POKEMON_ACCESSORS: { [key: string]: string } = {
+	_baseSpecies: 'baseSpecies', _status: 'status', _ability: 'ability', _item: 'item',
+};
 const ACTIVE_MOVE = new Set(['move']);
 
 // what State.cloneBattle has made so far, so references can point at the copies
@@ -427,7 +430,12 @@ export const State = new class {
 	}
 
 	serializePokemon(pokemon: Pokemon): /* Pokemon */ AnyObject {
-		const state: /* Pokemon */ AnyObject = this.serialize(pokemon, POKEMON, pokemon.battle);
+		const fields: /* Pokemon */ AnyObject = this.serialize(pokemon, POKEMON, pokemon.battle);
+		// fields with accessors are kept under another name, but serialized under their own
+		const state: /* Pokemon */ AnyObject = {};
+		for (const key in fields) {
+			state[POKEMON_ACCESSORS[key] || key] = fields[key];
+		}
 		state.set = pokemon.set;
 		// Only serialize the baseMoveSlots if they differ from moveSlots. We could get fancy and
 		// only serialize the diff and its index but thats overkill for a pretty niche case anyway.

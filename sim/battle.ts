@@ -314,7 +314,10 @@ export class Battle extends EmptyBase {
 	 */
 	presentCallbackNames: Set<string>;
 	presentEffects: unknown[];
-	/** counts the effect states made (see initEffectState) and event handlers added */
+	/**
+	 * counts the effect states made (see initEffectState), event handlers added, and changes to a
+	 * Pokemon's species, status, ability or item
+	 */
 	effectsAdded: number;
 
 	readonly NOT_FAIL: '';
@@ -1293,24 +1296,13 @@ export class Battle extends EmptyBase {
 	}
 
 	/**
-	 * Whether the battle has the same effects as when presentCallbackNames was worked out. Volatiles and
-	 * conditions can't be added without making a state, which is counted, but abilities, items and
-	 * statuses are sometimes set directly, so those are compared.
+	 * Whether the battle has the same effects as when presentCallbackNames was worked out. Making an
+	 * effect state, and changing a Pokemon's species, status, ability or item, are counted.
 	 */
 	hasPresentEffects() {
 		const effects = this.presentEffects;
 		const field = this.field;
-		let i = 0;
-		if (effects[i++] !== this.effectsAdded || effects[i++] !== field.weather || effects[i++] !== field.terrain) {
-			return false;
-		}
-		for (const side of this.sides) {
-			for (const pokemon of side.pokemon) {
-				if (effects[i++] !== pokemon || effects[i++] !== pokemon.status || effects[i++] !== pokemon.ability ||
-					effects[i++] !== pokemon.item || effects[i++] !== pokemon.baseSpecies) return false;
-			}
-		}
-		return i === effects.length;
+		return effects[0] === this.effectsAdded && effects[1] === field.weather && effects[2] === field.terrain;
 	}
 
 	findPresentCallbackNames() {
@@ -1330,7 +1322,6 @@ export class Battle extends EmptyBase {
 				for (const id in slotConditions) add(conditions.getByID(id as ID));
 			}
 			for (const pokemon of side.pokemon) {
-				effects.push(pokemon, pokemon.status, pokemon.ability, pokemon.item, pokemon.baseSpecies);
 				if (pokemon.status) add(pokemon.getStatus());
 				add(pokemon.getAbility());
 				if (pokemon.item) add(pokemon.getItem());
