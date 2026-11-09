@@ -319,6 +319,8 @@ export class Battle extends EmptyBase {
 	 * Pokemon's species, status, ability or item
 	 */
 	effectsAdded: number;
+	/** counts the effect states made without a Pokemon or Side as their target */
+	untargetedEffects: number;
 
 	readonly NOT_FAIL: '';
 	readonly HIT_SUBSTITUTE: 0;
@@ -358,6 +360,7 @@ export class Battle extends EmptyBase {
 		this.deserialized = !!options.deserialized;
 		this.strictChoices = !!options.strictChoices;
 		this.effectsAdded = 0;
+		this.untargetedEffects = 0;
 		this.formatData = this.initEffectState({ id: format.id });
 		this.gameType = (format.gameType || 'singles');
 		this.field = new Field(this);
@@ -1335,8 +1338,43 @@ export class Battle extends EmptyBase {
 		this.presentEffects = effects;
 	}
 
+	/**
+	 * Whether any of a Pokemon's effects (its status, volatiles, ability, item, species and slot conditions)
+	 * defines a callback. Like effectsDefineAny, but for one Pokemon.
+	 */
+	pokemonDefines(pokemon: Pokemon, callbackName: string) {
+		// abilities and items can run onStart for SwitchIn (see getCallback)
+		if (!this.started || callbackName === 'onSwitchIn') return true;
+		const side = pokemon.side;
+		// a Pokemon that isn't on its side's team yet, because it's still being made
+		if (side.pokemon[pokemon.position] !== pokemon) return true;
+		let names = pokemon.presentCallbackNames;
+		const key = pokemon.presentCallbackNamesKey;
+		if (!names || key[0] !== pokemon.effectsChanged || key[1] !== side.effectsChanged ||
+			key[2] !== this.untargetedEffects || key[3] !== pokemon.position) {
+			const found = new Set<string>();
+			const add = (effect: AnyObject) => {
+				for (const name of callbackNamesDefinedBy(effect)) found.add(name);
+			};
+			const conditions = this.dex.conditions;
+			if (pokemon.status) add(pokemon.getStatus());
+			for (const id in pokemon.volatiles) add(conditions.getByID(id as ID));
+			add(pokemon.getAbility());
+			if (pokemon.item) add(pokemon.getItem());
+			add(pokemon.baseSpecies);
+			for (const id in side.slotConditions[pokemon.position]) add(conditions.getByID(id as ID));
+			names = found;
+			pokemon.presentCallbackNames = names;
+			pokemon.presentCallbackNamesKey = [
+				pokemon.effectsChanged, side.effectsChanged, this.untargetedEffects, pokemon.position,
+			];
+		}
+		return names.has(callbackName);
+	}
+
 	findPokemonEventHandlers(pokemon: Pokemon, callbackName: string, getKey?: 'duration', handlers: EventListener[] = []) {
 		if (!getKey && !definedCallbackNames.has(callbackName)) return handlers;
+		if (!getKey && !this.pokemonDefines(pokemon, callbackName)) return handlers;
 		const callbacks = callbacksNamed(callbackName);
 
 		// an empty status or item has no callbacks
@@ -3626,7 +3664,15 @@ export class Battle extends EmptyBase {
 
 	initEffectState(obj: Partial<EffectState>, effectOrder?: number): EffectState {
 		// every volatile and condition gets its state from here, so this counts the effects added to the battle
-		if (obj.id) this.effectsAdded++;
+		if (obj.id) {
+			this.effectsAdded++;
+			const target = obj.target;
+			if (target instanceof Pokemon || target instanceof Side) {
+				target.effectsChanged++;
+			} else {
+				this.untargetedEffects++;
+			}
+		}
 		if (!obj.id) obj.id = '';
 		if (effectOrder !== undefined) {
 			obj.effectOrder = effectOrder;

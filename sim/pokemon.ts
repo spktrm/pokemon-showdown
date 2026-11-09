@@ -86,7 +86,7 @@ export class Pokemon extends EmptyBase {
 	details: string;
 
 	// baseSpecies, status, ability and item are set through accessors that count each change, so the
-	// battle can tell when the effects in it have changed (see Battle#hasPresentEffects)
+	// battle can tell when the effects in it have changed (see Battle#hasPresentEffects and pokemonDefines)
 	_baseSpecies!: Species;
 	get baseSpecies() {
 		return this._baseSpecies;
@@ -94,6 +94,7 @@ export class Pokemon extends EmptyBase {
 	set baseSpecies(baseSpecies: Species) {
 		this._baseSpecies = baseSpecies;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	species: Species;
 	speciesState: EffectState;
@@ -105,6 +106,7 @@ export class Pokemon extends EmptyBase {
 	set status(status: ID) {
 		this._status = status;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	statusState: EffectState;
 	volatiles: { [id: string]: EffectState };
@@ -141,6 +143,7 @@ export class Pokemon extends EmptyBase {
 	set ability(ability: ID) {
 		this._ability = ability;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	abilityState: EffectState;
 
@@ -151,6 +154,7 @@ export class Pokemon extends EmptyBase {
 	set item(item: ID) {
 		this._item = item;
 		this.battle.effectsAdded++;
+		this.effectsChanged++;
 	}
 	itemState: EffectState;
 	lastItem: ID;
@@ -352,6 +356,12 @@ export class Pokemon extends EmptyBase {
 	/**
 	 * An object for storing untyped data, for mods to use.
 	 */
+	/** counts changes to this Pokemon's effects (see Battle#pokemonDefines) */
+	effectsChanged: number;
+	/** the callback names this Pokemon's effects define, and the counts they were worked out at */
+	presentCallbackNames: Set<string> | null;
+	presentCallbackNamesKey: number[];
+
 	m: {
 		innate?: string, // Partners in Crime
 		originalSpecies?: string, // Mix and Mega
@@ -362,6 +372,9 @@ export class Pokemon extends EmptyBase {
 		super();
 		this.side = side;
 		this.battle = side.battle;
+		this.effectsChanged = 0;
+		this.presentCallbackNames = null;
+		this.presentCallbackNamesKey = [];
 
 		this.m = {};
 

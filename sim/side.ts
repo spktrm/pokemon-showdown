@@ -167,6 +167,8 @@ export type ChoiceRequest = SwitchRequest | TeamPreviewRequest | MoveRequest | W
 export class Side extends EmptyBase {
 	readonly battle: Battle;
 	readonly id: SideID;
+	/** counts the side and slot conditions added to this side (see Battle#pokemonDefines) */
+	effectsChanged: number;
 	/** Index in `battle.sides`: `battle.sides[side.n] === side` */
 	readonly n: number;
 
@@ -236,6 +238,7 @@ export class Side extends EmptyBase {
 		if (this.battle.format.side) Object.assign(this, this.battle.format.side);
 		this.id = ['p1', 'p2', 'p3', 'p4'][sideNum] as SideID;
 		this.n = sideNum;
+		this.effectsChanged = 0;
 
 		this.name = name;
 		this.avatar = '';
