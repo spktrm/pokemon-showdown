@@ -391,6 +391,14 @@ export class Battle {
 		return State.deserializeBattle(serialized);
 	}
 
+	/**
+	 * Copies the battle like `Battle.fromJSON(battle.toJSON())` does, but faster.
+	 * Like a deserialized battle, the copy sends nothing until it's restarted.
+	 */
+	clone(): Battle {
+		return State.cloneBattle(this);
+	}
+
 	get p1() {
 		return this.sides[0];
 	}

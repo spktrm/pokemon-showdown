@@ -61,6 +61,46 @@ describe('State', () => {
 			first.destroy();
 			second.destroy();
 		});
+		it('should be able to be cloned without affecting functionality', () => {
+			const control = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, TEAMS);
+			let test = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, TEAMS);
+
+			while (!(control.ended || test.ended)) {
+				control.makeChoices();
+				test.makeChoices();
+
+				assert.deepEqual(State.normalize(test.toJSON()), State.normalize(control.toJSON()));
+
+				const send = test.send;
+				const original = test;
+				test = test.clone();
+				test.restart(send);
+				original.destroy();
+			}
+
+			control.destroy();
+			test.destroy();
+		});
+		it('should not change the original battle when a clone is played', () => {
+			const battle = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, TEAMS);
+			battle.makeChoices();
+			const state = JSON.stringify(battle.toJSON());
+			const clone = battle.clone();
+			for (let i = 0; i < 3; i++) clone.makeChoices();
+
+			assert.equal(JSON.stringify(battle.toJSON()), state);
+			const restored = Battle.fromJSON(state);
+			const second = battle.clone();
+			for (let i = 0; i < 3; i++) {
+				restored.makeChoices();
+				second.makeChoices();
+			}
+			assert.deepEqual(State.normalize(second.toJSON()), State.normalize(restored.toJSON()));
+			battle.destroy();
+			clone.destroy();
+			restored.destroy();
+			second.destroy();
+		});
 		it('should require special treatment for complex objects', () => {
 			const battle = common.createBattle(TEAMS);
 			battle.foo = new Map();
