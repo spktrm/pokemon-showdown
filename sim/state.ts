@@ -43,13 +43,13 @@ type Referable = Battle | Field | Side | Pokemon | Condition | Ability | Item | 
 const BATTLE = new Set([
 	'dex', 'gen', 'ruleTable', 'id', 'log', 'inherit', 'format', 'teamGenerator',
 	'HIT_SUBSTITUTE', 'NOT_FAIL', 'FAIL', 'SILENT_FAIL', 'field', 'sides', 'prng', 'hints',
-	'deserialized', 'queue', 'actions', 'presentCallbackNames', 'presentEffects', 'effectsAdded', 'untargetedEffects',
+	'deserialized', 'queue', 'actions', 'presentCallbacks', 'presentEffects', 'effectsAdded', 'untargetedEffects',
 ]);
 const FIELD = new Set(['id', 'battle']);
 const SIDE = new Set(['battle', 'team', 'pokemon', 'choice', 'activeRequest', 'effectsChanged']);
 const POKEMON = new Set([
 	'side', 'battle', 'set', 'name', 'fullname', 'id',
-	'happiness', 'level', 'pokeball', 'baseMoveSlots', 'effectsChanged', 'presentCallbackNames', 'presentCallbackNamesKey',
+	'happiness', 'level', 'pokeball', 'baseMoveSlots', 'effectsChanged', 'presentCallbacks', 'presentCallbacksKey',
 ]);
 const CHOICE = new Set(['switchIns']);
 const POKEMON_ACCESSORS: { [key: string]: string } = {

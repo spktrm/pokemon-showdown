@@ -358,9 +358,9 @@ export class Pokemon extends EmptyBase {
 	 */
 	/** counts changes to this Pokemon's effects (see Battle#pokemonDefines) */
 	effectsChanged: number;
-	/** the callback names this Pokemon's effects define, and the counts they were worked out at */
-	presentCallbackNames: Set<string> | null;
-	presentCallbackNamesKey: number[];
+	/** the callback names this Pokemon's effects define (as bits), and the counts they were worked out at */
+	presentCallbacks: number[] | null;
+	presentCallbacksKey: number[];
 
 	m: {
 		innate?: string, // Partners in Crime
@@ -373,8 +373,8 @@ export class Pokemon extends EmptyBase {
 		this.side = side;
 		this.battle = side.battle;
 		this.effectsChanged = 0;
-		this.presentCallbackNames = null;
-		this.presentCallbackNamesKey = [];
+		this.presentCallbacks = null;
+		this.presentCallbacksKey = [];
 
 		this.m = {};
 
