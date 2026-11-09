@@ -219,6 +219,8 @@ export const State = new class {
 			case 'hints': battle.hints = new Set(source.hints); break;
 			case 'teamGenerator': battle.teamGenerator = null; break;
 			case 'deserialized': battle.deserialized = true; break;
+			// the copy has the same effects, so it keeps the callback names worked out for the source
+			case 'presentEffects': battle.presentEffects = this.cloneWithRefs(source.presentEffects, copy); break;
 			// like a deserialized battle, the copy sends nothing until it's restarted
 			case 'send': battle.send = () => {}; break;
 			default: this.copyProperty(battle, key, (source as AnyObject)[key], BATTLE.has(key), copy);
