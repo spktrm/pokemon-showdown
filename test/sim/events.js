@@ -104,4 +104,33 @@ describe('Battle#findEventHandlers', () => {
 		assert(checked.includes('onModifySTAB'));
 		assert.deepEqual(missing, []);
 	});
+
+	it('should find handlers of volatiles that are added directly', () => {
+		battle = common.createBattle([[
+			{ species: 'Mew', ability: 'synchronize', moves: ['tackle'] },
+		], [
+			{ species: 'Magikarp', ability: 'swiftswim', moves: ['splash'] },
+		]]);
+		battle.makeChoices();
+		const magikarp = battle.p2.active[0];
+		magikarp.volatiles['ability:pressure'] = battle.initEffectState({ id: 'ability:pressure', target: magikarp });
+		battle.makeChoices();
+		const tackle = battle.p1.active[0].moveSlots[0];
+		assert.equal(tackle.maxpp - tackle.pp, 3);
+		battle.destroy();
+	});
+
+	it('should find handlers of abilities that are set directly', () => {
+		battle = common.createBattle([[
+			{ species: 'Mew', ability: 'synchronize', moves: ['tackle'] },
+		], [
+			{ species: 'Magikarp', ability: 'swiftswim', moves: ['splash'] },
+		]]);
+		battle.makeChoices();
+		battle.p2.active[0].ability = 'pressure';
+		battle.makeChoices();
+		const tackle = battle.p1.active[0].moveSlots[0];
+		assert.equal(tackle.maxpp - tackle.pp, 3);
+		battle.destroy();
+	});
 });
