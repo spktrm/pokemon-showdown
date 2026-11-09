@@ -115,6 +115,27 @@ describe('State', () => {
 			battle.destroy();
 			clone.destroy();
 		});
+		it('should not show changes to a request to the clone or battle that shares it', () => {
+			const battle = common.createBattle(TEAMS);
+			const request = JSON.stringify(battle.p1.activeRequest);
+			const disableFirstMove = req => {
+				req.moves[0].disabled = true;
+			};
+			const clone = battle.clone();
+			clone.p1.updateRequestForPokemon(clone.p1.active[0], disableFirstMove);
+			clone.p1.emitRequest(clone.p1.activeRequest, true);
+			assert(clone.p1.activeRequest.update);
+			assert(clone.p1.activeRequest.active[0].moves[0].disabled);
+			assert.equal(JSON.stringify(battle.p1.activeRequest), request);
+
+			const second = battle.clone();
+			battle.p1.updateRequestForPokemon(battle.p1.active[0], disableFirstMove);
+			assert(battle.p1.activeRequest.active[0].moves[0].disabled);
+			assert.equal(JSON.stringify(second.p1.activeRequest), request);
+			battle.destroy();
+			clone.destroy();
+			second.destroy();
+		});
 		it('should require special treatment for complex objects', () => {
 			const battle = common.createBattle(TEAMS);
 			battle.foo = new Map();
