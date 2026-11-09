@@ -45,6 +45,12 @@ export const RESTORATIVE_BERRIES = new Set([
 	'leppaberry', 'aguavberry', 'enigmaberry', 'figyberry', 'iapapaberry', 'magoberry', 'sitrusberry', 'wikiberry', 'oranberry',
 ] as ID[]);
 
+const BOOST_TABLE = [1, 1.5, 2, 2.5, 3, 3.5, 4];
+// the events that modify each stat
+const MODIFY_STAT_EVENTS: { [s in StatIDExceptHP]: string } = {
+	atk: 'ModifyAtk', def: 'ModifyDef', spa: 'ModifySpA', spd: 'ModifySpD', spe: 'ModifySpe',
+};
+
 export class Pokemon extends EmptyBase {
 	readonly side: Side;
 	readonly battle: Battle;
@@ -649,13 +655,12 @@ export class Pokemon extends EmptyBase {
 		boosts[boostName] = boost;
 		boosts = this.battle.runEvent('ModifyBoost', statUser || this, null, null, boosts);
 		boost = boosts[boostName]!;
-		const boostTable = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 		if (boost > 6) boost = 6;
 		if (boost < -6) boost = -6;
 		if (boost >= 0) {
-			stat = Math.floor(stat * boostTable[boost]);
+			stat = Math.floor(stat * BOOST_TABLE[boost]);
 		} else {
-			stat = Math.floor(stat / boostTable[-boost]);
+			stat = Math.floor(stat / BOOST_TABLE[-boost]);
 		}
 
 		// stat modifier
@@ -687,20 +692,18 @@ export class Pokemon extends EmptyBase {
 				boosts = this.battle.runEvent('ModifyBoost', this, null, null, { ...boosts });
 			}
 			let boost = boosts[statName];
-			const boostTable = [1, 1.5, 2, 2.5, 3, 3.5, 4];
 			if (boost > 6) boost = 6;
 			if (boost < -6) boost = -6;
 			if (boost >= 0) {
-				stat = Math.floor(stat * boostTable[boost]);
+				stat = Math.floor(stat * BOOST_TABLE[boost]);
 			} else {
-				stat = Math.floor(stat / boostTable[-boost]);
+				stat = Math.floor(stat / BOOST_TABLE[-boost]);
 			}
 		}
 
 		// stat modifier effects
 		if (!unmodified) {
-			const statTable: { [s in StatIDExceptHP]: string } = { atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
-			stat = this.battle.runEvent('Modify' + statTable[statName], this, null, null, stat);
+			stat = this.battle.runEvent(MODIFY_STAT_EVENTS[statName], this, null, null, stat);
 		}
 
 		if (statName === 'spe' && stat > 10000 && !this.battle.format.battle?.trunc) stat = 10000;
