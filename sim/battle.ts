@@ -99,6 +99,50 @@ interface EventListener extends EventListenerWithoutPriority {
 
 type Part = string | number | boolean | Pokemon | Side | Effect | Move | null | undefined;
 
+interface HandlerPriorityNames {
+	order: string;
+	priority: string;
+	subOrder: string;
+	switchIn: boolean;
+	// handlers that tie are ordered by effectOrder
+	usesEffectOrder: boolean;
+}
+
+// the names a callback's order, priority and subOrder are under, so they aren't built for every handler
+const handlerPriorityNames = new Map<string, HandlerPriorityNames>();
+
+function priorityNamesOf(callbackName: string) {
+	let names = handlerPriorityNames.get(callbackName);
+	if (names === undefined) {
+		names = {
+			order: `${callbackName}Order`,
+			priority: `${callbackName}Priority`,
+			subOrder: `${callbackName}SubOrder`,
+			switchIn: callbackName.endsWith('SwitchIn'),
+			usesEffectOrder: callbackName.endsWith('SwitchIn') || callbackName.endsWith('RedirectTarget'),
+		};
+		handlerPriorityNames.set(callbackName, names);
+	}
+	return names;
+}
+
+// https://www.smogon.com/forums/threads/sword-shield-battle-mechanics-research.3655528/page-59#post-8685465
+const EFFECT_TYPE_SUB_ORDER: { [k in EffectType]?: number } = {
+	// Z-Move: 1,
+	Condition: 2,
+	// Slot Condition: 3,
+	// Side Condition: 4,
+	// Field Condition: 5, (includes weather but also terrains and pseudoweathers)
+	Weather: 5,
+	Format: 5,
+	Rule: 5,
+	Ruleset: 5,
+	// Poison Touch: 6, (also includes Perish Body)
+	Ability: 7,
+	Item: 8,
+	// Stall: 9,
+};
+
 // events usually run through EachEvent should never have any handlers besides `on${eventName}` so don't check for them
 const UNPREFIXED_EVENTS = new Set(['BeforeTurn', 'Update', 'Weather', 'WeatherChange', 'TerrainChange']);
 
@@ -1079,27 +1123,12 @@ export class Battle extends EmptyBase {
 
 	resolvePriority(h: EventListenerWithoutPriority, callbackName: string) {
 		const handler = h as EventListener;
-		handler.order = (handler.effect as any)[`${callbackName}Order`] || false;
-		handler.priority = (handler.effect as any)[`${callbackName}Priority`] || 0;
-		handler.subOrder = (handler.effect as any)[`${callbackName}SubOrder`] || 0;
+		const names = priorityNamesOf(callbackName);
+		handler.order = (handler.effect as any)[names.order] || false;
+		handler.priority = (handler.effect as any)[names.priority] || 0;
+		handler.subOrder = (handler.effect as any)[names.subOrder] || 0;
 		if (!handler.subOrder) {
-			// https://www.smogon.com/forums/threads/sword-shield-battle-mechanics-research.3655528/page-59#post-8685465
-			const effectTypeOrder: { [k in EffectType]?: number } = {
-				// Z-Move: 1,
-				Condition: 2,
-				// Slot Condition: 3,
-				// Side Condition: 4,
-				// Field Condition: 5, (includes weather but also terrains and pseudoweathers)
-				Weather: 5,
-				Format: 5,
-				Rule: 5,
-				Ruleset: 5,
-				// Poison Touch: 6, (also includes Perish Body)
-				Ability: 7,
-				Item: 8,
-				// Stall: 9,
-			};
-			handler.subOrder = effectTypeOrder[handler.effect.effectType] || 0;
+			handler.subOrder = EFFECT_TYPE_SUB_ORDER[handler.effect.effectType] || 0;
 			if (handler.effect.effectType === 'Condition') {
 				if (handler.state?.target instanceof Side) {
 					if (handler.state.isSlotCondition) {
@@ -1121,7 +1150,7 @@ export class Battle extends EmptyBase {
 				}
 			}
 		}
-		if (callbackName.endsWith('SwitchIn') || callbackName.endsWith('RedirectTarget')) {
+		if (names.usesEffectOrder) {
 			// If multiple hazards are present on one side, their event handlers all perfectly tie in speed, priority,
 			// and subOrder. They should activate in the order they were created, which is where effectOrder comes in.
 			// This also applies to speed ties for which ability like Lightning Rod redirects moves.
@@ -1135,7 +1164,7 @@ export class Battle extends EmptyBase {
 				callbackName === 'onAllyTryHitSide') {
 				handler.speed = pokemon.getStat('spe', true, true);
 			}
-			if (callbackName.endsWith('SwitchIn')) {
+			if (names.switchIn) {
 				// Pokemon speeds including ties are resolved before all onSwitchIn handlers and aren't re-sorted in-between
 				// so we subtract a fractional speed from each Pokemon's respective event handlers by using the index of their
 				// unique field position in a pre-sorted-by-speed array
