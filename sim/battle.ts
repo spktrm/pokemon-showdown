@@ -972,15 +972,20 @@ export class Battle extends EmptyBase {
 		if (!target) target = this;
 		let effectSource = null;
 		if (source instanceof Pokemon) effectSource = source;
-		const handlers = this.findEventHandlers(target, eventid, effectSource);
+		const callbackNames = callbackNamesOf(eventid);
+		// most events have no handlers, so check for that before looking for them
+		let handlers: EventListener[] = [];
+		if (Array.isArray(target) || this.effectsDefineAny(callbackNames, target, effectSource)) {
+			handlers = this.findEventHandlers(target, eventid, effectSource);
+		}
 		if (onEffect) {
 			if (!sourceEffect) throw new Error("onEffect passed without an effect");
-			const callback = (sourceEffect as any)[`on${eventid}`];
+			const callback = (sourceEffect as any)[callbackNames.on];
 			if (callback !== undefined) {
 				if (Array.isArray(target)) throw new Error("");
 				handlers.unshift(this.resolvePriority({
 					effect: sourceEffect, callback, state: this.initEffectState({}), end: null, effectHolder: target,
-				}, `on${eventid}`));
+				}, callbackNames.on));
 			}
 		}
 		if (!handlers.length) {
@@ -1245,6 +1250,7 @@ export class Battle extends EmptyBase {
 		if (Array.isArray(target)) {
 			for (const [i, pokemon] of target.entries()) {
 				// console.log(`Event: ${eventName}, Target: ${pokemon}, ${i}`);
+				if (!this.effectsDefineAny(callbackNamesOf(eventName), pokemon, source)) continue;
 				const curHandlers = this.findEventHandlers(pokemon, eventName, source);
 				for (const handler of curHandlers) {
 					handler.target = pokemon; // Original "effectHolder"
@@ -1254,9 +1260,8 @@ export class Battle extends EmptyBase {
 			}
 			return handlers;
 		}
+		// callers check effectsDefineAny first
 		const callbackNames = callbackNamesOf(eventName);
-		// most events have no handlers, so don't look for them when nothing in the battle has the callbacks
-		if (!this.effectsDefineAny(callbackNames, target, source)) return handlers;
 		const { hasOn, hasAlly, hasFoe, hasAny, hasSource } = callbackNames;
 		// events that target a Pokemon normally bubble up to the Side
 		const shouldBubbleDown = target instanceof Side;
