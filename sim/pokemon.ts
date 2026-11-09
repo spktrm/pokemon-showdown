@@ -85,11 +85,27 @@ export class Pokemon extends EmptyBase {
 	 */
 	details: string;
 
-	baseSpecies: Species;
+	// baseSpecies, status, ability and item are set through accessors that count each change, so the
+	// battle can tell when the effects in it have changed (see Battle#hasPresentEffects)
+	_baseSpecies!: Species;
+	get baseSpecies() {
+		return this._baseSpecies;
+	}
+	set baseSpecies(baseSpecies: Species) {
+		this._baseSpecies = baseSpecies;
+		this.battle.effectsAdded++;
+	}
 	species: Species;
 	speciesState: EffectState;
 
-	status: ID;
+	_status!: ID;
+	get status() {
+		return this._status;
+	}
+	set status(status: ID) {
+		this._status = status;
+		this.battle.effectsAdded++;
+	}
 	statusState: EffectState;
 	volatiles: { [id: string]: EffectState };
 	showCure?: boolean;
@@ -118,10 +134,24 @@ export class Pokemon extends EmptyBase {
 	boosts: BoostsTable;
 
 	baseAbility: ID;
-	ability: ID;
+	_ability!: ID;
+	get ability() {
+		return this._ability;
+	}
+	set ability(ability: ID) {
+		this._ability = ability;
+		this.battle.effectsAdded++;
+	}
 	abilityState: EffectState;
 
-	item: ID;
+	_item!: ID;
+	get item() {
+		return this._item;
+	}
+	set item(item: ID) {
+		this._item = item;
+		this.battle.effectsAdded++;
+	}
 	itemState: EffectState;
 	lastItem: ID;
 	usedItemThisTurn: boolean;
