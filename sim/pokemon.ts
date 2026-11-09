@@ -7,6 +7,7 @@
 
 import { State } from './state';
 import { toID } from './dex';
+import { EmptyBase } from './dex-data';
 import type { DynamaxOptions, MoveRequestData, PokemonMoveRequestData, PokemonSwitchRequestData } from './side';
 
 /** A Pokemon's move slot. */
@@ -44,7 +45,7 @@ export const RESTORATIVE_BERRIES = new Set([
 	'leppaberry', 'aguavberry', 'enigmaberry', 'figyberry', 'iapapaberry', 'magoberry', 'sitrusberry', 'wikiberry', 'oranberry',
 ] as ID[]);
 
-export class Pokemon {
+export class Pokemon extends EmptyBase {
 	readonly side: Side;
 	readonly battle: Battle;
 
@@ -328,6 +329,7 @@ export class Pokemon {
 	};
 
 	constructor(set: string | AnyObject, side: Side) {
+		super();
 		this.side = side;
 		this.battle = side.battle;
 
@@ -549,7 +551,7 @@ export class Pokemon {
 		return this.side.n + this.battle.sides.length * this.position;
 	}
 
-	toString() {
+	override toString() {
 		const fullname = (this.illusion) ? this.illusion.fullname : this.fullname;
 		return this.isActive ? this.getSlot() + fullname.slice(2) : fullname;
 	}
@@ -562,7 +564,10 @@ export class Pokemon {
 			(this.gender === '' ? '' : `, ${this.gender}`) + (this.set.shiny ? ', shiny' : '');
 	}
 
-	getFullDetails = () => {
+	// getFullDetails and getHealth are passed to battle.add without their Pokemon, so each Pokemon has its own
+	getFullDetails = this.fullDetails.bind(this);
+
+	fullDetails() {
 		const health = this.getHealth();
 		let details = this.details;
 		if (this.illusion) {
@@ -572,7 +577,7 @@ export class Pokemon {
 		}
 		if (this.terastallized) details += `, tera:${this.terastallized}`;
 		return { side: health.side, secret: `${details}|${health.secret}`, shared: `${details}|${health.shared}` };
-	};
+	}
 
 	updateSpeed() {
 		this.speed = this.getActionSpeed();
@@ -2078,7 +2083,9 @@ export class Pokemon {
 		}
 	}
 
-	getHealth = () => {
+	getHealth = this.health.bind(this);
+
+	health() {
 		if (!this.hp) return { side: this.side.id, secret: '0 fnt', shared: '0 fnt' };
 		let secret = `${this.hp}/${this.maxhp}`;
 		let shared;
@@ -2122,7 +2129,7 @@ export class Pokemon {
 			shared += ` ${this.status}`;
 		}
 		return { side: this.side.id, secret, shared };
-	};
+	}
 
 	/**
 	 * Sets a type (except on Arceus, who resists type changes)

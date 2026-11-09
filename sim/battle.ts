@@ -16,7 +16,7 @@
 
 import { Dex, toID } from './dex';
 import {
-	abilityCallbackNames, definedCallbackNames, formatCallbackNames, itemCallbackNames, speciesCallbackNames,
+	abilityCallbackNames, definedCallbackNames, EmptyBase, formatCallbackNames, itemCallbackNames, speciesCallbackNames,
 } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
@@ -192,7 +192,7 @@ function callbackNamesDefinedBy(effect: AnyObject) {
 // An individual Side's request state is encapsulated in its `activeRequest` field.
 export type RequestState = 'teampreview' | 'move' | 'switch' | '';
 
-export class Battle {
+export class Battle extends EmptyBase {
 	readonly id: ID;
 	readonly debugMode: boolean;
 	readonly forceRandomChance: boolean | null;
@@ -284,6 +284,7 @@ export class Battle {
 	clampIntRange: (num: any, min?: number, max?: number) => number;
 	toID = toID;
 	constructor(options: BattleOptions) {
+		super();
 		this.log = [];
 		this.add('t:', Math.floor(Date.now() / 1000));
 
@@ -445,7 +446,7 @@ export class Battle {
 		return this.sides[3];
 	}
 
-	toString() {
+	override toString() {
 		return `Battle: ${this.format}`;
 	}
 

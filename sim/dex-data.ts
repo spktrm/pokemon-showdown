@@ -87,6 +87,13 @@ export function addDefinedCallbackNames(data: AnyObject, names = definedCallback
 	}
 }
 
+/**
+ * Battle, Field, Side and Pokemon extend this so State.cloneBattle can make empty ones with
+ * `Reflect.construct(EmptyBase, [], Pokemon)`, which skips their constructors but gives the
+ * objects the same hidden class their constructors start with.
+ */
+export class EmptyBase {}
+
 export abstract class BasicEffect implements EffectData {
 	/**
 	 * ID. This will be a lowercase version of the name with all the
