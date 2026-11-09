@@ -329,8 +329,11 @@ export function deepClone(obj: any): any {
 	if (obj === null || typeof obj !== 'object') return obj;
 	if (Array.isArray(obj)) return obj.map(prop => deepClone(prop));
 	const clone = Object.create(Object.getPrototypeOf(obj));
-	for (const key of Object.keys(obj)) {
-		clone[key] = deepClone(obj[key]);
+	// for-in with a hasOwnProperty check visits the same keys as Object.keys, without making an array
+	for (const key in obj) {
+		if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+		const value = obj[key];
+		clone[key] = typeof value === 'object' && value !== null ? deepClone(value) : value;
 	}
 	return clone;
 }
