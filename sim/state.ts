@@ -264,8 +264,8 @@ export const State = new class {
 				side.choice = choice;
 				break;
 			}
-			// requests are plain data, so they're copied rather than worked out again
-			case 'activeRequest': side.activeRequest = this.cloneWithRefs(source.activeRequest, copy); break;
+			// requests are plain data, so they're shared rather than worked out again
+			case 'activeRequest': side.activeRequest = source.shareActiveRequest(); break;
 			default: this.copyProperty(side, key, (source as AnyObject)[key], SIDE.has(key), copy);
 			}
 		}

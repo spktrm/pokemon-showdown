@@ -164,6 +164,10 @@ export interface WaitRequest {
 }
 export type ChoiceRequest = SwitchRequest | TeamPreviewRequest | MoveRequest | WaitRequest;
 
+// Requests a battle shares with its copies (see State.cloneBattle). A side with one of these copies it
+// before changing it, so the change isn't seen by the other battles.
+const sharedRequests = new WeakSet<ChoiceRequest>();
+
 export class Side extends EmptyBase {
 	readonly battle: Battle;
 	readonly id: SideID;
@@ -524,7 +528,12 @@ export class Side extends EmptyBase {
 	}
 
 	emitRequest(update: ChoiceRequest = this.activeRequest!, updatedRequest = false) {
-		if (updatedRequest) (this.activeRequest as MoveRequest | SwitchRequest).update = true;
+		if (updatedRequest) {
+			const request = this.activeRequest;
+			this.unshareActiveRequest();
+			if (update === request) update = this.activeRequest!;
+			(this.activeRequest as MoveRequest | SwitchRequest).update = true;
+		}
 		this.battle.send('sideupdate', `${this.id}\n|request|${JSON.stringify(update)}`);
 		this.activeRequest = update;
 	}
@@ -912,9 +921,22 @@ export class Side extends EmptyBase {
 		if (!(this.activeRequest as MoveRequest)?.active) {
 			throw new Error(`Can't update a request without active Pokemon`);
 		}
+		this.unshareActiveRequest();
 		const req = (this.activeRequest as MoveRequest).active[pokemon.position];
 		if (!req) throw new Error(`Pokemon not found in request's active field`);
 		return update(req) ?? true;
+	}
+
+	/** The side's request, which a copy of the battle can now have too (see sharedRequests) */
+	shareActiveRequest() {
+		if (this.activeRequest) sharedRequests.add(this.activeRequest);
+		return this.activeRequest;
+	}
+
+	unshareActiveRequest() {
+		if (this.activeRequest && sharedRequests.has(this.activeRequest)) {
+			this.activeRequest = Utils.deepClone(this.activeRequest);
+		}
 	}
 
 	chooseSwitch(slotText?: string) {
