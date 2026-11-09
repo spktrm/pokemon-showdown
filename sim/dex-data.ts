@@ -26,7 +26,14 @@ export function toID(text: any): ID {
 		if (typeof text === 'number') text = `${text}`;
 		else if (typeof text !== 'string') return '';
 	}
-	return text.toLowerCase().replace(/[^a-z0-9]+/g, '') as ID;
+	// most text passed in is already an ID
+	for (let i = 0; i < text.length; i++) {
+		const code = text.charCodeAt(i);
+		if ((code < 97 || code > 122) && (code < 48 || code > 57)) {
+			return text.toLowerCase().replace(/[^a-z0-9]+/g, '') as ID;
+		}
+	}
+	return text as ID;
 }
 
 /**
