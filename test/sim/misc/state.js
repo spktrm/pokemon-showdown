@@ -4,6 +4,7 @@ const assert = require('./../../assert');
 const common = require('./../../common');
 const Battle = require('./../../../dist/sim/battle').Battle;
 const State = require('./../../../dist/sim/state').State;
+const Pokemon = require('./../../../dist/sim/pokemon').Pokemon;
 
 const TEAMS = [[
 	{ species: 'Mew', ability: 'synchronize', item: 'assaultvest', moves: ['psychic'] },
@@ -100,6 +101,19 @@ describe('State', () => {
 			clone.destroy();
 			restored.destroy();
 			second.destroy();
+		});
+		it('should not change the moves the original battle has used when a clone is played', () => {
+			const battle = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, TEAMS);
+			battle.makeChoices();
+			const movesOf = b => JSON.stringify([b.lastMove, ...b.getAllActive().map(p => [p.lastMove, p.lastMoveUsed])],
+				(key, value) => (value instanceof Pokemon ? `${value}` : value));
+			const moves = movesOf(battle);
+			const clone = battle.clone();
+			for (let i = 0; i < 3; i++) clone.makeChoices();
+
+			assert.equal(movesOf(battle), moves);
+			battle.destroy();
+			clone.destroy();
 		});
 		it('should require special treatment for complex objects', () => {
 			const battle = common.createBattle(TEAMS);
