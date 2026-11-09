@@ -15,6 +15,7 @@
  */
 
 import { Dex, toID } from './dex';
+import { EmptyBase } from './dex-data';
 import { Teams } from './teams';
 import { Field } from './field';
 import { Pokemon, type EffectState, RESTORATIVE_BERRIES } from './pokemon';
@@ -106,7 +107,7 @@ type Part = string | number | boolean | Pokemon | Side | Effect | Move | null | 
 // An individual Side's request state is encapsulated in its `activeRequest` field.
 export type RequestState = 'teampreview' | 'move' | 'switch' | '';
 
-export class Battle {
+export class Battle extends EmptyBase {
 	readonly id: ID;
 	readonly debugMode: boolean;
 	readonly forceRandomChance: boolean | null;
@@ -190,6 +191,7 @@ export class Battle {
 	clampIntRange: (num: any, min?: number, max?: number) => number;
 	toID = toID;
 	constructor(options: BattleOptions) {
+		super();
 		this.log = [];
 		this.add('t:', Math.floor(Date.now() / 1000));
 
@@ -348,7 +350,7 @@ export class Battle {
 		return this.sides[3];
 	}
 
-	toString() {
+	override toString() {
 		return `Battle: ${this.format}`;
 	}
 

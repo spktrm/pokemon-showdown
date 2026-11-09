@@ -10,11 +10,14 @@
  */
 
 import { Battle } from './battle';
-import { Dex } from './dex';
+import { Dex, type ModdedDex } from './dex';
+import { EmptyBase } from './dex-data';
 import { Field } from './field';
 import { Pokemon } from './pokemon';
 import { PRNG } from './prng';
 import { type Choice, Side } from './side';
+import { BattleQueue } from './battle-queue';
+import { BattleActions } from './battle-actions';
 import { Utils } from '../lib/utils';
 
 // The simulator supports up to 24 different Pokemon on a team. Serialization
@@ -50,6 +53,16 @@ const POKEMON = new Set([
 ]);
 const CHOICE = new Set(['switchIns']);
 const ACTIVE_MOVE = new Set(['move']);
+
+// what State.cloneBattle has made so far, so references can point at the copies
+interface BattleCopy {
+	battle: Battle;
+	field: Field;
+	sides: Side[];
+	pokemon: Pokemon[][];
+	dex: ModdedDex;
+	moves: Map<ActiveMove, ActiveMove>;
+}
 
 export const State = new class {
 	// REFERABLE is used to determine which objects are of the Referable type by
@@ -161,99 +174,160 @@ export const State = new class {
 		return battle;
 	}
 
-	// Copies a Battle like deserializeBattle(serializeBattle(battle)) would, but without
-	// building the serialized state in between.
+	// Copies a Battle like deserializeBattle(serializeBattle(battle)) would, but without building
+	// the serialized state in between. The battle, field, sides and Pokemon are made empty (see
+	// EmptyBase) and their fields are copied in the order they were added to the source's, so the
+	// copies end up with the same hidden classes as objects their constructors make.
 	cloneBattle(source: Battle): Battle {
-		const options = {
-			format: source.format,
-			formatid: source.format.id,
-			seed: source.prngSeed,
-			rated: source.rated,
-			debug: source.debugMode,
-			deserialized: true,
-			strictChoices: source.strictChoices,
+		const copy: BattleCopy = {
+			battle: Reflect.construct(EmptyBase, [], Battle) as Battle,
+			field: Reflect.construct(EmptyBase, [], Field) as Field,
+			sides: source.sides.map(() => Reflect.construct(EmptyBase, [], Side) as Side),
+			pokemon: source.sides.map(side => side.pokemon.map(() => Reflect.construct(EmptyBase, [], Pokemon) as Pokemon)),
+			dex: source.dex,
+			moves: new Map(),
 		};
-		// like serializeSide, a side's team is the sets of the Pokemon it has, in the order of its team
-		const teams = source.sides.map(side => side.team.filter(set => side.pokemon.some(p => p.set === set)));
+		this.fillBattle(source, copy);
+		this.fillField(source.field, copy);
 		for (const [i, side] of source.sides.entries()) {
-			// @ts-expect-error index signature
-			options[side.id] = {
-				name: side.name,
-				avatar: side.avatar,
-				team: teams[i].map(set => Utils.deepClone(set)),
-			};
+			this.fillSide(side, i, copy);
 		}
-		const battle = new Battle(options);
-		for (const [i, side] of source.sides.entries()) {
-			// put the new Pokemon in the order the source's are in now
-			const pokemon = battle.sides[i].pokemon;
-			const ordered = new Array(pokemon.length);
-			for (const [j, sourcePokemon] of side.pokemon.entries()) {
-				ordered[j] = pokemon[teams[i].indexOf(sourcePokemon.set)];
-			}
-			battle.sides[i].pokemon = ordered;
-		}
-		// the same ActiveMove can be in more than one place, so each one is only copied once
-		const moves = new Map<ActiveMove, ActiveMove>();
-		this.copy(source, battle, BATTLE, battle, moves);
-		this.copy(source.field, battle.field, FIELD, battle, moves);
-		let activeRequests = false;
-		for (const [i, side] of source.sides.entries()) {
-			this.cloneSide(side, battle.sides[i], moves);
-			activeRequests = activeRequests || side.activeRequest !== null;
-		}
-		if (activeRequests) {
+		// like deserializeBattle, work out the requests again
+		const battle = copy.battle;
+		if (source.sides.some(side => side.activeRequest !== null)) {
 			const requests = battle.getRequests(battle.requestState);
 			for (const [i, side] of source.sides.entries()) {
 				battle.sides[i].activeRequest = side.activeRequest === null ? null : requests[i];
 			}
 		}
-		battle.prng = new PRNG(source.prng.getSeed());
-		battle.queue.list = this.cloneWithRefs(source.queue.list, battle, moves) as Action[];
-		(battle as any).hints = new Set(source.hints);
-		(battle as any).log = source.log.slice();
 		return battle;
 	}
 
-	cloneSide(source: Side, side: Side, moves: Map<ActiveMove, ActiveMove>) {
-		this.copy(source, side, SIDE, side.battle, moves);
-		for (const [i, pokemon] of source.pokemon.entries()) {
-			this.clonePokemon(pokemon, side.pokemon[i], moves);
+	fillBattle(source: Battle, copy: BattleCopy) {
+		const battle = copy.battle as AnyObject;
+		for (const key in source) {
+			switch (key) {
+			case 'log': battle.log = source.log.slice(); break;
+			case 'field': battle.field = copy.field; break;
+			case 'sides': battle.sides = copy.sides; break;
+			case 'prng': battle.prng = new PRNG(source.prng.getSeed()); break;
+			case 'queue':
+				battle.queue = new BattleQueue(copy.battle);
+				battle.queue.list = this.cloneWithRefs(source.queue.list, copy);
+				break;
+			case 'actions': battle.actions = new BattleActions(copy.battle); break;
+			case 'hints': battle.hints = new Set(source.hints); break;
+			case 'teamGenerator': battle.teamGenerator = null; break;
+			case 'deserialized': battle.deserialized = true; break;
+			// like a deserialized battle, the copy sends nothing until it's restarted
+			case 'send': battle.send = () => {}; break;
+			default: this.copyProperty(battle, key, (source as AnyObject)[key], BATTLE.has(key), copy);
+			}
 		}
-		this.copy(source.choice, side.choice, CHOICE, side.battle, moves);
-		side.choice.switchIns = new Set(source.choice.switchIns);
 	}
 
-	clonePokemon(source: Pokemon, pokemon: Pokemon, moves: Map<ActiveMove, ActiveMove>) {
-		this.copy(source, pokemon, POKEMON, pokemon.battle, moves);
-		let baseMoveSlots;
-		if (source.baseMoveSlots.length !== source.moveSlots.length ||
-			!source.baseMoveSlots.every((ms, i) => ms === source.moveSlots[i])) {
-			baseMoveSlots = this.cloneWithRefs(source.baseMoveSlots, pokemon.battle, moves) as Pokemon['baseMoveSlots'];
+	fillField(source: Field, copy: BattleCopy) {
+		const field = copy.field as AnyObject;
+		for (const key in source) {
+			if (key === 'battle') {
+				field.battle = copy.battle;
+			} else {
+				this.copyProperty(field, key, (source as AnyObject)[key], FIELD.has(key), copy);
+			}
 		}
-		this.setBaseMoveSlots(pokemon, baseMoveSlots);
-		if (source.showCure === undefined) pokemon.showCure = undefined;
+	}
+
+	fillSide(source: Side, n: number, copy: BattleCopy) {
+		const side = copy.sides[n] as AnyObject;
+		// like serializeSide, the team is the sets of the Pokemon the side has, in the order of its team
+		const team = source.team.filter(set => source.pokemon.some(p => p.set === set));
+		const sets = team.map(set => Utils.deepClone(set));
+		for (const key in source) {
+			switch (key) {
+			case 'battle': side.battle = copy.battle; break;
+			case 'team': side.team = sets; break;
+			case 'pokemon': side.pokemon = copy.pokemon[n]; break;
+			case 'choice': {
+				const choice = { ...source.choice };
+				choice.actions = this.cloneWithRefs(source.choice.actions, copy) as Choice['actions'];
+				choice.switchIns = new Set(source.choice.switchIns);
+				side.choice = choice;
+				break;
+			}
+			// worked out again once everything is copied
+			case 'activeRequest': side.activeRequest = null; break;
+			default: this.copyProperty(side, key, (source as AnyObject)[key], SIDE.has(key), copy);
+			}
+		}
+		for (const [i, pokemon] of source.pokemon.entries()) {
+			this.fillPokemon(pokemon, copy.pokemon[n][i], sets[team.indexOf(pokemon.set)], copy);
+		}
+	}
+
+	fillPokemon(source: Pokemon, pokemon: AnyObject, set: PokemonSet, copy: BattleCopy) {
+		const moveSlots = this.cloneWithRefs(source.moveSlots, copy) as Pokemon['moveSlots'];
+		for (const key in source) {
+			const value = (source as AnyObject)[key];
+			// most of a Pokemon's fields are numbers, strings and booleans
+			if (typeof value !== 'object' || value === null) {
+				// these are bound to the copy, like Pokemon's constructor does
+				if (key === 'getFullDetails') {
+					pokemon.getFullDetails = pokemon.fullDetails.bind(pokemon);
+				} else if (key === 'getHealth') {
+					pokemon.getHealth = pokemon.health.bind(pokemon);
+				} else {
+					pokemon[key] = value;
+				}
+				continue;
+			}
+			switch (key) {
+			case 'side': pokemon.side = copy.sides[source.side.n]; break;
+			case 'battle': pokemon.battle = copy.battle; break;
+			case 'set': pokemon.set = set; break;
+			case 'moveSlots': pokemon.moveSlots = moveSlots; break;
+			case 'baseMoveSlots': {
+				let baseMoveSlots;
+				if (source.baseMoveSlots.length !== source.moveSlots.length ||
+					!source.baseMoveSlots.every((ms, i) => ms === source.moveSlots[i])) {
+					baseMoveSlots = this.cloneWithRefs(source.baseMoveSlots, copy) as Pokemon['baseMoveSlots'];
+				}
+				pokemon.baseMoveSlots = this.matchBaseMoveSlots(moveSlots, baseMoveSlots);
+				break;
+			}
+			default: this.copyProperty(pokemon, key, value, POKEMON.has(key), copy);
+			}
+		}
+	}
+
+	// copies a field of a Battle, Field, Side or Pokemon; the ones (de)serialization skips are shared
+	copyProperty(obj: AnyObject, key: string, value: unknown, share: boolean, copy: BattleCopy) {
+		// functions (from scripts) are shared too
+		if (share || typeof value !== 'object' || value === null) {
+			obj[key] = value;
+		} else {
+			obj[key] = this.cloneWithRefs(value, copy);
+		}
 	}
 
 	// like deserializeActiveMove(serializeActiveMove(move))
-	cloneActiveMove(source: ActiveMove, battle: Battle, moves: Map<ActiveMove, ActiveMove>): ActiveMove {
-		let move = moves.get(source);
+	cloneActiveMove(source: ActiveMove, copy: BattleCopy): ActiveMove {
+		let move = copy.moves.get(source);
 		if (move) return move;
-		const base = battle.dex.moves.get(source.id);
-		move = battle.dex.getActiveMove(base);
-		moves.set(source, move);
+		const base = copy.dex.moves.get(source.id);
+		move = copy.dex.getActiveMove(base);
+		copy.moves.set(source, move);
 		for (const key in source) {
 			const value = (source as AnyObject)[key];
 			const baseValue = (base as AnyObject)[key];
 			if (typeof baseValue === 'object' || value === baseValue || ACTIVE_MOVE.has(key)) continue;
-			const copied = this.cloneWithRefs(value, battle, moves);
+			const copied = this.cloneWithRefs(value, copy);
 			if (copied !== undefined) (move as AnyObject)[key] = copied;
 		}
 		return move;
 	}
 
 	// like deserializeWithRefs(serializeWithRefs(obj)), but dex objects are shared rather than looked up again
-	cloneWithRefs(obj: unknown, battle: Battle, moves: Map<ActiveMove, ActiveMove>): unknown {
+	cloneWithRefs(obj: unknown, copy: BattleCopy): unknown {
 		switch (typeof obj) {
 		case 'function':
 			return undefined;
@@ -263,17 +337,17 @@ export const State = new class {
 				const arr = new Array(obj.length);
 				for (let i = 0; i < obj.length; i++) {
 					// JSON turns undefined in an array into null
-					arr[i] = this.cloneWithRefs(obj[i], battle, moves) ?? null;
+					arr[i] = this.cloneWithRefs(obj[i], copy) ?? null;
 				}
 				return arr;
 			}
 
-			if (this.isActiveMove(obj)) return this.cloneActiveMove(obj, battle, moves);
+			if (this.isActiveMove(obj)) return this.cloneActiveMove(obj, copy);
 			if (this.isReferable(obj)) {
-				if (obj instanceof Pokemon) return battle.sides[obj.side.n].pokemon[obj.position];
-				if (obj instanceof Side) return battle.sides[obj.n];
-				if (obj instanceof Field) return battle.field;
-				if (obj instanceof Battle) return battle;
+				if (obj instanceof Pokemon) return copy.pokemon[obj.side.n][obj.position];
+				if (obj instanceof Side) return copy.sides[obj.n];
+				if (obj instanceof Field) return copy.field;
+				if (obj instanceof Battle) return copy.battle;
 				return obj;
 			}
 			if (obj.constructor !== Object) {
@@ -284,7 +358,7 @@ export const State = new class {
 			for (const key in obj) {
 				const value = (obj as AnyObject)[key];
 				if (typeof value === 'object' && value !== null) {
-					o[key] = this.cloneWithRefs(value, battle, moves);
+					o[key] = this.cloneWithRefs(value, copy);
 				} else if (value !== undefined && typeof value !== 'function') {
 					o[key] = value;
 				}
@@ -365,25 +439,24 @@ export const State = new class {
 	deserializePokemon(state: /* Pokemon */ AnyObject, pokemon: Pokemon) {
 		// pokemon.set is already state.set (or a copy of it), from the team the Battle was created with
 		this.deserialize(state, pokemon, POKEMON, pokemon.battle);
-		this.setBaseMoveSlots(pokemon, state.baseMoveSlots && this.deserializeWithRefs(state.baseMoveSlots, pokemon.battle));
+		(pokemon as any).baseMoveSlots = this.matchBaseMoveSlots(
+			pokemon.moveSlots, state.baseMoveSlots && this.deserializeWithRefs(state.baseMoveSlots, pokemon.battle)
+		);
 		if (state.showCure === undefined) pokemon.showCure = undefined;
 	}
 
-	setBaseMoveSlots(pokemon: Pokemon, baseMoveSlots?: Pokemon['baseMoveSlots']) {
+	matchBaseMoveSlots(moveSlots: Pokemon['moveSlots'], baseMoveSlots?: Pokemon['baseMoveSlots']) {
 		// baseMoveSlots and moveSlots need to point to the same objects (ie. identity, not equality).
 		// If we serialized the baseMoveSlots, replace any that match moveSlots to preserve the
 		// identity relationship requirement.
-		if (baseMoveSlots) {
-			for (const [i, baseMoveSlot] of baseMoveSlots.entries()) {
-				const moveSlot = pokemon.moveSlots[i];
-				if (moveSlot.id === baseMoveSlot.id && !moveSlot.virtual) {
-					baseMoveSlots[i] = moveSlot;
-				}
+		if (!baseMoveSlots) return moveSlots.slice();
+		for (const [i, baseMoveSlot] of baseMoveSlots.entries()) {
+			const moveSlot = moveSlots[i];
+			if (moveSlot.id === baseMoveSlot.id && !moveSlot.virtual) {
+				baseMoveSlots[i] = moveSlot;
 			}
-		} else {
-			baseMoveSlots = pokemon.moveSlots.slice();
 		}
-		(pokemon as any).baseMoveSlots = baseMoveSlots;
+		return baseMoveSlots;
 	}
 
 	serializeChoice(choice: Choice, battle: Battle): /* Choice */ AnyObject {
@@ -562,21 +635,6 @@ export const State = new class {
 			if (typeof val !== 'undefined') state[key] = val;
 		}
 		return state;
-	}
-
-	// like deserialize(serialize(source))
-	copy(source: object, obj: object, skip: Set<string>, battle: Battle, moves: Map<ActiveMove, ActiveMove>) {
-		for (const key in source) {
-			if (skip.has(key)) continue;
-			const value = (source as AnyObject)[key];
-			if (typeof value === 'object' && value !== null) {
-				// @ts-expect-error index signature
-				obj[key] = this.cloneWithRefs(value, battle, moves);
-			} else if (value !== undefined && typeof value !== 'function') {
-				// @ts-expect-error index signature
-				obj[key] = value;
-			}
-		}
 	}
 
 	deserialize(state: AnyObject, obj: object, skip: Set<string>, battle: Battle) {

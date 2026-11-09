@@ -24,6 +24,7 @@ import type { RequestState } from './battle';
 import { Pokemon, type EffectState } from './pokemon';
 import { State } from './state';
 import { toID } from './dex';
+import { EmptyBase } from './dex-data';
 import { type Move } from './dex-moves';
 
 /** A single action that can be chosen. Choices will have one Action for each pokemon. */
@@ -163,7 +164,7 @@ export interface WaitRequest {
 }
 export type ChoiceRequest = SwitchRequest | TeamPreviewRequest | MoveRequest | WaitRequest;
 
-export class Side {
+export class Side extends EmptyBase {
 	readonly battle: Battle;
 	readonly id: SideID;
 	/** Index in `battle.sides`: `battle.sides[side.n] === side` */
@@ -227,6 +228,7 @@ export class Side {
 	lastEnemySelectedMove: ID = 'nomove' as ID;
 
 	constructor(name: string, battle: Battle, sideNum: number, team: PokemonSet[]) {
+		super();
 		const sideScripts = battle.dex.data.Scripts.side;
 		if (sideScripts) Object.assign(this, sideScripts);
 
@@ -350,7 +352,7 @@ export class Side {
 		}).join(', ');
 	}
 
-	toString() {
+	override toString() {
 		return `${this.id}: ${this.name}`;
 	}
 
