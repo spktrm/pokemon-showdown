@@ -545,28 +545,36 @@ export class Battle extends EmptyBase {
 		// `speedSort` is used for.
 		// More importantly, it makes it easiest to resolve speed ties
 		// properly.
+		// the first `count` entries are the next indexes
+		const nextIndexes = [sorted];
 		while (sorted + 1 < list.length) {
-			let nextIndexes = [sorted];
+			nextIndexes[0] = sorted;
+			let count = 1;
 			// grab list of next indexes
 			for (let i = sorted + 1; i < list.length; i++) {
 				const delta = comparator(list[nextIndexes[0]], list[i]);
 				if (delta < 0) continue;
-				if (delta > 0) nextIndexes = [i];
-				if (delta === 0) nextIndexes.push(i);
+				if (delta > 0) {
+					nextIndexes[0] = i;
+					count = 1;
+				}
+				if (delta === 0) nextIndexes[count++] = i;
 			}
 			// put list of next indexes where they belong
-			for (let i = 0; i < nextIndexes.length; i++) {
+			for (let i = 0; i < count; i++) {
 				const index = nextIndexes[i];
 				if (index !== sorted + i) {
 					// nextIndexes is guaranteed to be in order, so it will never have
 					// been disturbed by an earlier swap
-					[list[sorted + i], list[index]] = [list[index], list[sorted + i]];
+					const swapped = list[sorted + i];
+					list[sorted + i] = list[index];
+					list[index] = swapped;
 				}
 			}
-			if (nextIndexes.length > 1) {
-				this.prng.shuffle(list, sorted, sorted + nextIndexes.length);
+			if (count > 1) {
+				this.prng.shuffle(list, sorted, sorted + count);
 			}
-			sorted += nextIndexes.length;
+			sorted += count;
 		}
 	}
 
