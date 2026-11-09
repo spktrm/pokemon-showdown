@@ -116,6 +116,9 @@ interface EventCallbackNames {
 	hasSource: boolean;
 	// the size of definedCallbackNames when the has* flags were set
 	definedCount: number;
+	// whether a battle's presentCallbackNames has any of these names, and which set that was
+	present: boolean;
+	presentIn: Set<string> | null;
 }
 
 // callback names for each event, so they aren't rebuilt on every call
@@ -133,6 +136,7 @@ function callbackNamesOf(eventName: string): EventCallbackNames {
 			prefixed: !UNPREFIXED_EVENTS.has(eventName),
 			hasOn: false, hasAlly: false, hasFoe: false, hasAny: false, hasSource: false,
 			definedCount: -1,
+			present: true, presentIn: null,
 		};
 		eventCallbackNames.set(eventName, names);
 	}
@@ -161,6 +165,21 @@ function callbacksNamed(callbackName: string) {
 		callbacksByName.set(callbackName, callbacks);
 	}
 	return callbacks;
+}
+
+// the callback names each effect defines
+const definedCallbackNamesByEffect = new WeakMap<object, string[]>();
+
+function callbackNamesDefinedBy(effect: AnyObject) {
+	let names = definedCallbackNamesByEffect.get(effect);
+	if (names === undefined) {
+		names = [];
+		for (const key in effect) {
+			if (key.startsWith('on')) names.push(key);
+		}
+		definedCallbackNamesByEffect.set(effect, names);
+	}
+	return names;
 }
 
 // The current request state of the Battle:
@@ -245,6 +264,14 @@ export class Battle {
 	teamGenerator: ReturnType<typeof Teams.getGenerator> | null;
 
 	readonly hints: Set<string>;
+	/**
+	 * Callback names that effects in the battle define, and what the battle had in it
+	 * when they were worked out (see effectsDefineAny)
+	 */
+	presentCallbackNames: Set<string>;
+	presentEffects: unknown[];
+	/** counts the effect states made (see initEffectState) and event handlers added */
+	effectsAdded: number;
 
 	readonly NOT_FAIL: '';
 	readonly HIT_SUBSTITUTE: 0;
@@ -282,6 +309,7 @@ export class Battle {
 			options.forceRandomChance : null;
 		this.deserialized = !!options.deserialized;
 		this.strictChoices = !!options.strictChoices;
+		this.effectsAdded = 0;
 		this.formatData = this.initEffectState({ id: format.id });
 		this.gameType = (format.gameType || 'singles');
 		this.field = new Field(this);
@@ -336,6 +364,8 @@ export class Battle {
 		this.teamGenerator = null;
 
 		this.hints = new Set();
+		this.presentCallbackNames = new Set();
+		this.presentEffects = [];
 
 		this.NOT_FAIL = '';
 		this.HIT_SUBSTITUTE = 0;
@@ -1153,6 +1183,8 @@ export class Battle {
 			return handlers;
 		}
 		const callbackNames = callbackNamesOf(eventName);
+		// most events have no handlers, so don't look for them when nothing in the battle has the callbacks
+		if (!this.effectsDefineAny(callbackNames, target, source)) return handlers;
 		const { hasOn, hasAlly, hasFoe, hasAny, hasSource } = callbackNames;
 		// events that target a Pokemon normally bubble up to the Side
 		const shouldBubbleDown = target instanceof Side;
@@ -1200,6 +1232,78 @@ export class Battle {
 		if (hasOn) this.findFieldEventHandlers(this.field, callbackNames.on, undefined, undefined, handlers);
 		this.findBattleEventHandlers(callbackNames.on, undefined, undefined, handlers);
 		return handlers;
+	}
+
+	/**
+	 * Whether any effect in the battle defines one of an event's callbacks. The names are worked
+	 * out again whenever the battle's effects have changed since the last time.
+	 */
+	effectsDefineAny(callbackNames: EventCallbackNames, target: Pokemon | Side | Battle, source?: Pokemon | null) {
+		// abilities and items can run onStart for SwitchIn (see getCallback)
+		if (!this.started || callbackNames.on === 'onSwitchIn') return true;
+		// a Pokemon that isn't on its side's team yet, because it's still being made
+		if (target instanceof Pokemon && target.side.pokemon[target.position] !== target) return true;
+		if (source && source.side.pokemon[source.position] !== source) return true;
+		if (!this.hasPresentEffects()) this.findPresentCallbackNames();
+		const names = this.presentCallbackNames;
+		if (callbackNames.presentIn !== names) {
+			callbackNames.present = names.has(callbackNames.on) || names.has(callbackNames.ally) ||
+				names.has(callbackNames.foe) || names.has(callbackNames.any) || names.has(callbackNames.source);
+			callbackNames.presentIn = names;
+		}
+		return callbackNames.present;
+	}
+
+	/**
+	 * Whether the battle has the same effects as when presentCallbackNames was worked out. Volatiles and
+	 * conditions can't be added without making a state, which is counted, but abilities, items and
+	 * statuses are sometimes set directly, so those are compared.
+	 */
+	hasPresentEffects() {
+		const effects = this.presentEffects;
+		const field = this.field;
+		let i = 0;
+		if (effects[i++] !== this.effectsAdded || effects[i++] !== field.weather || effects[i++] !== field.terrain) {
+			return false;
+		}
+		for (const side of this.sides) {
+			for (const pokemon of side.pokemon) {
+				if (effects[i++] !== pokemon || effects[i++] !== pokemon.status || effects[i++] !== pokemon.ability ||
+					effects[i++] !== pokemon.item || effects[i++] !== pokemon.baseSpecies) return false;
+			}
+		}
+		return i === effects.length;
+	}
+
+	findPresentCallbackNames() {
+		const names = new Set<string>();
+		const add = (effect: AnyObject) => {
+			for (const name of callbackNamesDefinedBy(effect)) names.add(name);
+		};
+		const field = this.field;
+		const conditions = this.dex.conditions;
+		const effects: unknown[] = [this.effectsAdded, field.weather, field.terrain];
+		if (field.weather) add(field.getWeather());
+		if (field.terrain) add(field.getTerrain());
+		for (const id in field.pseudoWeather) add(conditions.getByID(id as ID));
+		for (const side of this.sides) {
+			for (const id in side.sideConditions) add(conditions.getByID(id as ID));
+			for (const slotConditions of side.slotConditions) {
+				for (const id in slotConditions) add(conditions.getByID(id as ID));
+			}
+			for (const pokemon of side.pokemon) {
+				effects.push(pokemon, pokemon.status, pokemon.ability, pokemon.item, pokemon.baseSpecies);
+				if (pokemon.status) add(pokemon.getStatus());
+				add(pokemon.getAbility());
+				if (pokemon.item) add(pokemon.getItem());
+				add(pokemon.baseSpecies);
+				for (const id in pokemon.volatiles) add(conditions.getByID(id as ID));
+			}
+		}
+		add(this.format);
+		for (const callbackName in this.events) names.add(callbackName);
+		this.presentCallbackNames = names;
+		this.presentEffects = effects;
 	}
 
 	findPokemonEventHandlers(pokemon: Pokemon, callbackName: string, getKey?: 'duration', handlers: EventListener[] = []) {
@@ -1399,6 +1503,7 @@ export class Battle {
 		}
 
 		const eventHandler = { callback, target, priority, order, subOrder };
+		this.effectsAdded++;
 
 		if (!this.events) this.events = {};
 		const callbackName = `on${eventid}`;
@@ -3491,6 +3596,8 @@ export class Battle {
 	}
 
 	initEffectState(obj: Partial<EffectState>, effectOrder?: number): EffectState {
+		// every volatile and condition gets its state from here, so this counts the effects added to the battle
+		if (obj.id) this.effectsAdded++;
 		if (!obj.id) obj.id = '';
 		if (effectOrder !== undefined) {
 			obj.effectOrder = effectOrder;
