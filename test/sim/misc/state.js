@@ -136,6 +136,32 @@ describe('State', () => {
 			clone.destroy();
 			second.destroy();
 		});
+		it('should clone and restore a Pokemon transformed into one with fewer moves', () => {
+			const battle = common.createBattle({ seed: 'sodium,00000001000000020000000300000004' }, [[
+				{ species: 'Ditto', ability: 'imposter', moves: ['transform', 'protect', 'tackle'] },
+			], [
+				{ species: 'Snorlax', ability: 'thickfat', moves: ['rest', 'bodyslam'] },
+			]]);
+			const ditto = battle.p1.active[0];
+			// The case itself: fewer moves copied than Ditto holds.
+			assert(ditto.transformed);
+			assert(ditto.moveSlots.length < ditto.baseMoveSlots.length);
+
+			const clone = battle.clone();
+			const restored = Battle.fromJSON(JSON.stringify(battle.toJSON()));
+			for (const copy of [clone, restored]) {
+				assert.deepEqual(copy.p1.active[0].baseMoveSlots.map(slot => slot.id), ['transform', 'protect', 'tackle']);
+				assert.deepEqual(State.normalize(copy.toJSON()), State.normalize(battle.toJSON()));
+			}
+			for (let i = 0; i < 2; i++) {
+				for (const played of [battle, clone, restored]) played.makeChoices();
+			}
+			assert.deepEqual(State.normalize(clone.toJSON()), State.normalize(battle.toJSON()));
+			assert.deepEqual(State.normalize(restored.toJSON()), State.normalize(battle.toJSON()));
+			battle.destroy();
+			clone.destroy();
+			restored.destroy();
+		});
 		it('should require special treatment for complex objects', () => {
 			const battle = common.createBattle(TEAMS);
 			battle.foo = new Map();
