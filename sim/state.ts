@@ -545,11 +545,12 @@ export const State = new class {
 	matchBaseMoveSlots(moveSlots: Pokemon['moveSlots'], baseMoveSlots?: Pokemon['baseMoveSlots']) {
 		// baseMoveSlots and moveSlots need to point to the same objects (ie. identity, not equality).
 		// If we serialized the baseMoveSlots, replace any that match moveSlots to preserve the
-		// identity relationship requirement.
+		// identity relationship requirement. A Pokemon that transformed into one with fewer moves
+		// holds fewer moveSlots than baseMoveSlots.
 		if (!baseMoveSlots) return moveSlots.slice();
 		for (const [i, baseMoveSlot] of baseMoveSlots.entries()) {
 			const moveSlot = moveSlots[i];
-			if (moveSlot.id === baseMoveSlot.id && !moveSlot.virtual) {
+			if (moveSlot && moveSlot.id === baseMoveSlot.id && !moveSlot.virtual) {
 				baseMoveSlots[i] = moveSlot;
 			}
 		}
