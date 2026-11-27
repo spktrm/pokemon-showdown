@@ -1914,7 +1914,7 @@
         ]
     },
     "swampert": {
-        "level": 83,
+        "level": 82,
         "sets": [
             {
                 "role": "Bulky Support",
@@ -3397,12 +3397,6 @@
                 "movepool": ["Encore", "Knock Off", "Psychic Noise", "Stealth Rock", "Thunder Wave", "U-turn", "Yawn"],
                 "abilities": ["Levitate"],
                 "teraTypes": ["Dark", "Electric", "Steel"]
-            },
-            {
-                "role": "Bulky Setup",
-                "movepool": ["Draining Kiss", "Encore", "Nasty Plot", "Psychic Noise", "Psyshock", "Substitute"],
-                "abilities": ["Levitate"],
-                "teraTypes": ["Fairy"]
             }
         ]
     },
@@ -5380,7 +5374,7 @@
         ]
     },
     "lycanrocmidnight": {
-        "level": 89,
+        "level": 88,
         "sets": [
             {
                 "role": "Fast Attacker",
@@ -7169,7 +7163,7 @@
         ]
     },
     "brutebonnet": {
-        "level": 80,
+        "level": 79,
         "sets": [
             {
                 "role": "Bulky Attacker",
@@ -7350,7 +7344,7 @@
         ]
     },
     "ironthorns": {
-        "level": 82,
+        "level": 81,
         "sets": [
             {
                 "role": "Fast Bulky Setup",

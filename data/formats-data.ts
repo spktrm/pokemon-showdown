@@ -342,7 +342,7 @@ export const FormatsData: import('../sim/dex-species').SpeciesFormatsDataTable =
 		natDexTier: "RU",
 	},
 	ninetalesalola: {
-		tier: "ZU",
+		tier: "ZUBL",
 		doublesTier: "DOU",
 		natDexTier: "RU",
 	},
@@ -868,7 +868,7 @@ export const FormatsData: import('../sim/dex-species').SpeciesFormatsDataTable =
 	chansey: {
 		tier: "PU",
 		doublesTier: "NFE",
-		natDexTier: "RU",
+		natDexTier: "NFE",
 	},
 	blissey: {
 		tier: "RU",
@@ -3232,7 +3232,7 @@ export const FormatsData: import('../sim/dex-species').SpeciesFormatsDataTable =
 	basculegionf: {
 		tier: "RU",
 		doublesTier: "DUU",
-		natDexTier: "RU",
+		natDexTier: "RUBL",
 	},
 	sandile: {
 		tier: "LC",

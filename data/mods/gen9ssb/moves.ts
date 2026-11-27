@@ -876,7 +876,8 @@ export const Moves: import('../../../sim/dex-moves').ModdedMoveDataTable = {
 						}
 					}
 					const randomStat: BoostID | undefined = stats.length ? this.sample(stats) : undefined;
-					const randomStat2: BoostID | undefined = stats.length ? this.sample(stats.filter(s => s !== randomStat)) : undefined;
+					const remainingStats = stats.filter(stat => stat !== randomStat);
+					const randomStat2: BoostID | undefined = remainingStats.length ? this.sample(remainingStats) : undefined;
 					if (randomStat && randomStat2) {
 						if (chance <= 40) {
 							boost[randomStat] = -1;
@@ -896,7 +897,8 @@ export const Moves: import('../../../sim/dex-moves').ModdedMoveDataTable = {
 						}
 					}
 				} else if (chance <= 80) {
-					target.side.addSideCondition(this.sample(sideConditions.filter(hazard => !target.side.getSideCondition(hazard))));
+					const availableHazards = sideConditions.filter(hazard => !target.side.getSideCondition(hazard));
+					if (availableHazards.length) target.side.addSideCondition(this.sample(availableHazards));
 				} else if (chance <= 90) {
 					move.drain = [3, 4];
 				} else {
@@ -1129,7 +1131,7 @@ export const Moves: import('../../../sim/dex-moves').ModdedMoveDataTable = {
 		onHit(target, source, move) {
 			if (this.randomChance(1, 5)) {
 				changeSet(this, source, ssbSets['Billo-Solgaleo'], true);
-				source.addVolatile('trapped', source, move, 'trapper');
+				if (source.runTrappingImmunity()) source.addVolatile('trapped', source, move, 'trapper');
 				source.addVolatile('perishsong');
 				this.add('-start', source, 'perish3', '[silent]');
 				this.boost({ atk: 1 }, source, source, move);
@@ -1707,6 +1709,7 @@ export const Moves: import('../../../sim/dex-moves').ModdedMoveDataTable = {
 				target.addVolatile('curse');
 				success = true;
 			}
+			if (!target.runTrappingImmunity()) return success;
 			return target.addVolatile('trapped', source, move, 'trapper') || success;
 		},
 		zMove: { effect: 'heal' },
@@ -2635,7 +2638,7 @@ export const Moves: import('../../../sim/dex-moves').ModdedMoveDataTable = {
 		secondary: {
 			chance: 100,
 			onHit(target, source, move) {
-				if (source.isActive) target.addVolatile('trapped', source, move, 'trapper');
+				if (source.isActive && target.runTrappingImmunity()) target.addVolatile('trapped', source, move, 'trapper');
 			},
 		},
 		target: "normal",
